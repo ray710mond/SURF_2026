@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>surf_multirobot_sim</name>
+  <version>0.0.1</version>
+  <description>Two differential-drive robots with 3D LiDAR in Gazebo Harmonic.</description>
+  <maintainer email="raymond@todo.invalid">Raymond</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>ros_gz_sim</exec_depend>
+  <exec_depend>ros_gz_bridge</exec_depend>
+  <exec_depend>rosgraph_msgs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>tf2_msgs</exec_depend>
+  <depend>rclcpp</depend>
+  <depend>bonxai_ros</depend>
+  <exec_depend>fast_lio</exec_depend>
+  <depend>tf2_geometry_msgs</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

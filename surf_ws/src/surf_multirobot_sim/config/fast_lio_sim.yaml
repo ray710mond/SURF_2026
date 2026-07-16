@@ -1,0 +1,39 @@
+/**:
+  ros__parameters:
+    use_sim_time: true
+    feature_extract_enable: false
+    point_filter_num: 2
+    max_iteration: 3
+    filter_size_surf: 0.25
+    filter_size_map: 0.25
+    cube_side_length: 200.0
+    runtime_pos_log_enable: false
+    common:
+      time_sync_en: false
+      time_offset_lidar_to_imu: 0.0
+    preprocess:
+      # Values 1-4 select Livox / Velodyne / Ouster-specific parsers in this
+      # ROS 2 port. Use 5 to invoke the generic PointXYZI handler for Gazebo.
+      lidar_type: 5
+      scan_line: 16
+      scan_rate: 10
+      timestamp_unit: 0
+      blind: 0.30
+    mapping:
+      acc_cov: 0.05
+      gyr_cov: 0.05
+      b_acc_cov: 0.0001
+      b_gyr_cov: 0.0001
+      fov_degree: 360.0
+      det_range: 50.0
+      extrinsic_est_en: false
+      extrinsic_T: [0.0, 0.0, 0.50]
+      extrinsic_R: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+    publish:
+      path_en: true
+      scan_publish_en: true
+      dense_publish_en: true
+      scan_bodyframe_pub_en: false
+    pcd_save:
+      pcd_save_en: false
+      interval: -1

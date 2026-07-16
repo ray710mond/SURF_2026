@@ -1,0 +1,27 @@
+bonxai_server_node:
+  ros__parameters:
+    use_sim_time: true
+    frame_id: map
+    topic_in: /shared/points
+
+    occupancy:
+      resolution: 0.10
+      occupancy_min_z: 0.10
+      occupancy_max_z: 5.0
+      occupancy_threshold: 0.50
+
+    sensor_model:
+      max_range: 50.0
+      hit: 0.70
+      miss: 0.40
+      min: 0.12
+      max: 0.97
+
+    server:
+      cleanup_interval_sec: 300.0
+
+    stats:
+      enable_stats: true
+      quick_stats: true
+      publish_occupied_voxels: true
+      publish_rate: 2.0
