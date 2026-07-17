@@ -5,7 +5,8 @@ bonxai_server_node:
     topic_in: /shared/points
 
     occupancy:
-      resolution: 0.10
+      static_resolution: 0.10
+      dynamic_resolution: 0.10
       occupancy_min_z: 0.25
       occupancy_max_z: 20.0
       occupancy_threshold: 0.50
@@ -21,7 +22,7 @@ bonxai_server_node:
       cleanup_interval_sec: 300.0
 
     map_storage:
-      path: /home/raymond/SURF_2026/maps/static_map.bonxai
+      path: /home/raymond/SURF_2026/surf_ws/src/surf_multirobot_sim/maps/static_map.bonxai
       load_on_startup: true
       save_on_shutdown: true
 
@@ -29,7 +30,8 @@ bonxai_server_node:
       enable_stats: true
       quick_stats: true
       publish_occupied_voxels: true
-      publish_rate: 2.0
+      static_publish_rate: 0.5
+      dynamic_publish_rate: 10.0
 
     dynamic_obstacles:
       enabled: true
