@@ -25,3 +25,12 @@ bonxai_server_node:
       quick_stats: true
       publish_occupied_voxels: true
       publish_rate: 2.0
+
+    dynamic_obstacles:
+      enabled: true
+      decay_time_sec: 2.0
+      decay_interval_sec: 0.25
+      static_demotion_time_sec: 30.0
+      static_stability_hits: 30
+      static_stability_time_sec: 1.0
+      min_probability: 0.05
