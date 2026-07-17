@@ -6,4 +6,4 @@
 	url = https://github.com/Livox-SDK/livox_ros_driver2.git
 [submodule "surf_ws/src/rolling_bonxai"]
 	path = surf_ws/src/rolling_bonxai
-	url = https://github.com/mukundbala/Rolling-Bonxai.git
+	url = https://github.com/ray710mond/Rolling-Bonxai.git
