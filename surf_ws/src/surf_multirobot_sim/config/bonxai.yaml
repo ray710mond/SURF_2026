@@ -20,6 +20,11 @@ bonxai_server_node:
     server:
       cleanup_interval_sec: 300.0
 
+    map_storage:
+      path: /home/raymond/SURF_2026/maps/static_map.bonxai
+      load_on_startup: true
+      save_on_shutdown: true
+
     stats:
       enable_stats: true
       quick_stats: true
