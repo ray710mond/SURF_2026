@@ -1,0 +1,4 @@
+# time_s,bandwidth_mbps,one_way_latency_ms,jitter_ms,loss_percent
+0,80,8,2,0.1
+45,20,25,8,1.0
+75,60,10,3,0.2

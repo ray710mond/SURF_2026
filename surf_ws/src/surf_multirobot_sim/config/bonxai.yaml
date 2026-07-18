@@ -1,8 +1,9 @@
-bonxai_server_node:
+/**/bonxai_server_node:
   ros__parameters:
     use_sim_time: true
     frame_id: map
     topic_in: /shared/points
+    delta_topic_in: ""
 
     occupancy:
       static_resolution: 0.10
@@ -24,12 +25,15 @@ bonxai_server_node:
     map_storage:
       path: /home/raymond/SURF_2026/surf_ws/src/surf_multirobot_sim/maps/static_map.bonxai
       load_on_startup: true
+      # Both robot-local servers currently share this path. On shutdown, the
+      # last server to finish determines the persisted map.
       save_on_shutdown: true
 
     stats:
       enable_stats: true
       quick_stats: true
       publish_occupied_voxels: true
+      publish_rate: 1.0
       static_publish_rate: 0.5
       dynamic_publish_rate: 10.0
 
