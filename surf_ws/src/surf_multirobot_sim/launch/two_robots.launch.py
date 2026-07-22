@@ -2,45 +2,55 @@ from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, TimerAction
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
 def generate_launch_description():
     package_share = Path(get_package_share_directory('surf_multirobot_sim'))
+    drone_share = Path(get_package_share_directory('surf_drone'))
+    humanoid_share = Path(get_package_share_directory('surf_humanoid'))
     ros_gz_share = Path(get_package_share_directory('ros_gz_sim'))
 
     world_file = package_share / 'worlds' / 'outdoor.sdf'
     robot_file = package_share / 'models' / 'diffbot' / 'model.sdf'
     bridge_file = package_share / 'config' / 'bridge.yaml'
     bonxai_file = package_share / 'config' / 'bonxai.yaml'
+    drone_file = drone_share / 'config' / 'drone.yaml'
+    humanoid_file = humanoid_share / 'config' / 'humanoid.yaml'
     fast_lio_file = package_share / 'config' / 'fast_lio_sim.yaml'
 
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(str(ros_gz_share / 'launch' / 'gz_sim.launch.py')),
-        launch_arguments={'gz_args': f'-r -v 3 {world_file}'}.items(),
+        launch_arguments={
+            'gz_args': [
+                '-r -v 3 ', LaunchConfiguration('gz_extra_args'), ' ', str(world_file),
+            ],
+        }.items(),
     )
 
-    robot1 = Node(
+    humanoid = Node(
         package='ros_gz_sim',
         executable='create',
         output='screen',
         arguments=[
             '-world', 'outdoor',
-            '-name', 'robot1',
+            '-name', 'humanoid',
             '-file', str(robot_file),
             '-x', '-4.0', '-y', '-1.5', '-z', '0.001', '-Y', '0.0',
         ],
     )
 
-    robot2 = Node(
+    drone = Node(
         package='ros_gz_sim',
         executable='create',
         output='screen',
         arguments=[
             '-world', 'outdoor',
-            '-name', 'robot2',
+            '-name', 'drone',
             '-file', str(robot_file),
             '-x', '4.0', '-y', '1.5', '-z', '0.001', '-Y', '3.14159',
         ],
@@ -64,23 +74,91 @@ def generate_launch_description():
         output='screen',
         arguments=['-d', str(package_share / 'config' / 'two_robots.rviz')],
         parameters=[{'use_sim_time': True}],
+        condition=IfCondition(LaunchConfiguration('use_rviz')),
     )
 
-    shared_cloud_mux = Node(
-        package='surf_multirobot_sim',
-        executable='shared_cloud_mux',
-        name='shared_cloud_mux',
-        output='screen',
-        parameters=[{'use_sim_time': True}],
-    )
-
-    bonxai = Node(
+    humanoid_map = Node(
         package='bonxai_ros',
         executable='bonxai_server_node',
+        namespace='humanoid',
         name='bonxai_server_node',
         output='screen',
-        parameters=[str(bonxai_file)],
+        parameters=[
+            str(bonxai_file),
+            {
+                'topic_in': '/humanoid/points',
+                'delta_topic_in': '/humanoid/comm/drone_voxel_delta',
+                'map_storage.path': str(package_share / 'maps' / 'static_map.bonxai'),
+                'map_storage.save_on_shutdown': True,
+            },
+        ],
     )
+
+    drone_map = Node(
+        package='bonxai_ros',
+        executable='bonxai_server_node',
+        namespace='drone',
+        name='bonxai_server_node',
+        output='screen',
+        parameters=[
+            str(bonxai_file),
+            {
+                'topic_in': '/drone/points',
+                'delta_topic_in': '',
+                'map_storage.load_on_startup': False,
+                'map_storage.save_on_shutdown': False,
+            },
+        ],
+    )
+
+    drone_sender = Node(
+        package='surf_drone',
+        executable='drone_scan_sender',
+        namespace='drone',
+        name='drone_scan_sender',
+        output='screen',
+        parameters=[str(drone_file)],
+    )
+
+    humanoid_receiver = Node(
+        package='surf_humanoid',
+        executable='drone_data_receiver',
+        namespace='humanoid',
+        name='drone_data_receiver',
+        output='screen',
+        parameters=[str(humanoid_file)],
+    )
+
+    def link_node(source, destination, radio, **profile):
+        reliable = radio == 'wifi'
+        return Node(
+            package='surf_multirobot_sim',
+            executable='link_emulator',
+            name=f'{source}_to_{destination}_{radio}',
+            output='screen',
+            parameters=[{
+                'link_name': f'{source}_to_{destination}_{radio}',
+                'input_topic': f'/{source}/comm/{radio}_tx',
+                'output_topic': f'/{destination}/comm/{radio}_rx',
+                'metrics_topic': f'/{source}/comm/{radio}_metrics',
+                'trace_path': LaunchConfiguration(f'{radio}_trace'),
+                'reliable_qos': reliable,
+                **profile,
+            }],
+        )
+
+    link_emulators = [
+        link_node(
+            'drone', 'humanoid', 'halow', bandwidth_mbps=4.0,
+            latency_ms=25.0, jitter_ms=5.0, loss_percent=0.5,
+            queue_depth=2, freshness_first=True,
+        ),
+        link_node(
+            'drone', 'humanoid', 'wifi', bandwidth_mbps=80.0,
+            latency_ms=8.0, jitter_ms=2.0, loss_percent=0.1,
+            queue_depth=20, freshness_first=False,
+        ),
+    ]
 
     fast_lio_nodes = [
         Node(
@@ -107,7 +185,7 @@ def generate_launch_description():
                 ('/Laser_map', f'/{robot_name}/lio/map'),
             ],
         )
-        for robot_name in ('robot1', 'robot2')
+        for robot_name in ('humanoid', 'drone')
     ]
 
     ground_truth_bridges = [
@@ -123,7 +201,7 @@ def generate_launch_description():
                 (f'/model/{robot_name}/pose', f'/{robot_name}/ground_truth_tf'),
             ],
         )
-        for robot_name in ('robot1', 'robot2')
+        for robot_name in ('humanoid', 'drone')
     ]
 
     localization_nodes = [
@@ -140,7 +218,7 @@ def generate_launch_description():
                 'base_z_offset': 0.25,
             }],
         )
-        for robot_name in ('robot1', 'robot2')
+        for robot_name in ('humanoid', 'drone')
     ]
 
     static_transforms = [
@@ -161,8 +239,8 @@ def generate_launch_description():
             arguments=[
                 '--x', '0', '--y', '0', '--z', '0.50',
                 '--roll', '0', '--pitch', '0', '--yaw', '0',
-                '--frame-id', 'robot1/base_link',
-                '--child-frame-id', 'robot1/lidar_link',
+                '--frame-id', 'humanoid/base_link',
+                '--child-frame-id', 'humanoid/lidar_link',
             ],
         ),
         Node(
@@ -171,20 +249,41 @@ def generate_launch_description():
             arguments=[
                 '--x', '0', '--y', '0', '--z', '0.50',
                 '--roll', '0', '--pitch', '0', '--yaw', '0',
-                '--frame-id', 'robot2/base_link',
-                '--child-frame-id', 'robot2/lidar_link',
+                '--frame-id', 'drone/base_link',
+                '--child-frame-id', 'drone/lidar_link',
             ],
         ),
     ]
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            'halow_trace', default_value='',
+            description='CSV trace used to replay measured HaLow link conditions',
+        ),
+        DeclareLaunchArgument(
+            'wifi_trace', default_value='',
+            description='CSV trace used to replay measured 5 GHz Wi-Fi link conditions',
+        ),
+        DeclareLaunchArgument(
+            'use_rviz', default_value='true',
+            description='Start RViz with the two-robot mapping display',
+        ),
+        DeclareLaunchArgument(
+            'gz_extra_args', default_value='',
+            description='Additional Gazebo arguments; use -s for headless server mode',
+        ),
         gazebo,
         rviz,
-        TimerAction(period=2.0, actions=[robot1, robot2]),
+        TimerAction(period=2.0, actions=[humanoid, drone]),
         TimerAction(
             period=3.0,
             actions=[
-                bridge, shared_cloud_mux, bonxai,
+                bridge,
+                humanoid_map,
+                drone_map,
+                drone_sender,
+                humanoid_receiver,
+                *link_emulators,
                 *fast_lio_nodes, *ground_truth_bridges,
                 *localization_nodes, *static_transforms,
             ],

@@ -1,0 +1,38 @@
+/**/drone_scan_sender:
+  ros__parameters:
+    use_sim_time: true
+    robot_name: drone
+    map_frame: map
+    input_topic: /drone/points
+    realtime_topic: /drone/comm/halow_tx
+    sync_topic: /drone/comm/wifi_tx
+    link_metrics_topic: /drone/comm/halow_metrics
+    metrics_topic: /drone/comm/pipeline_metrics
+    resolution: 0.20
+    compression_level: 1
+    delta_refresh_scans: 50
+    tombstone_retention_scans: 500
+    dynamic_retention_scans: 20
+    sync_interval_seconds: 10.0
+    maximum_ray_voxels: 600
+    maximum_clear_rays: 256
+    filters:
+      min_range: 0.75
+      max_range: 50.0
+      min_z: 0.25
+      max_z: 20.0
+      self_radius: 0.70
+      static_min_hits: 20
+      clear_min_misses: 3
+    adaptive:
+      enabled: true
+      manual_mode: -1
+      full_min_mbps: 12.0
+      delta_min_mbps: 3.0
+      dynamic_min_mbps: 0.75
+      up_hysteresis_mbps: 1.0
+      down_hold_seconds: 2.0
+      up_hold_seconds: 5.0
+      minimum_dwell_seconds: 5.0
+      ewma_alpha: 0.20
+      congested_queue_depth: 2
