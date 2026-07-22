@@ -1,0 +1,89 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <model name="surf_lamp_post">
+    <static>true</static>
+    <link name="lamp_post">
+      <collision name="base_collision">
+        <pose>0 0 0.12 0 0 0</pose>
+        <geometry><cylinder><radius>0.16</radius><length>0.24</length></cylinder></geometry>
+      </collision>
+      <collision name="post_collision">
+        <pose>0 0 1.65 0 0 0</pose>
+        <geometry><cylinder><radius>0.055</radius><length>3.10</length></cylinder></geometry>
+      </collision>
+      <collision name="lantern_collision">
+        <pose>0 0 3.31 0 0 0</pose>
+        <geometry><box><size>0.34 0.34 0.42</size></box></geometry>
+      </collision>
+
+      <visual name="base_visual">
+        <pose>0 0 0.12 0 0 0</pose>
+        <geometry><cylinder><radius>0.16</radius><length>0.24</length></cylinder></geometry>
+        <material>
+          <ambient>0.025 0.028 0.026 1</ambient>
+          <diffuse>0.055 0.060 0.055 1</diffuse>
+          <specular>0.30 0.30 0.28 1</specular>
+        </material>
+      </visual>
+      <visual name="base_cap_visual">
+        <pose>0 0 0.25 0 0 0</pose>
+        <geometry><cylinder><radius>0.11</radius><length>0.08</length></cylinder></geometry>
+        <material>
+          <ambient>0.025 0.028 0.026 1</ambient>
+          <diffuse>0.055 0.060 0.055 1</diffuse>
+          <specular>0.30 0.30 0.28 1</specular>
+        </material>
+      </visual>
+      <visual name="post_visual">
+        <pose>0 0 1.65 0 0 0</pose>
+        <geometry><cylinder><radius>0.050</radius><length>3.10</length></cylinder></geometry>
+        <material>
+          <ambient>0.025 0.028 0.026 1</ambient>
+          <diffuse>0.055 0.060 0.055 1</diffuse>
+          <specular>0.30 0.30 0.28 1</specular>
+        </material>
+      </visual>
+      <visual name="lower_finial_visual">
+        <pose>0 0 3.11 0 0 0</pose>
+        <geometry><cylinder><radius>0.13</radius><length>0.08</length></cylinder></geometry>
+        <material>
+          <ambient>0.025 0.028 0.026 1</ambient>
+          <diffuse>0.055 0.060 0.055 1</diffuse>
+          <specular>0.30 0.30 0.28 1</specular>
+        </material>
+      </visual>
+      <visual name="lantern_glass_visual">
+        <pose>0 0 3.31 0 0 0</pose>
+        <geometry><box><size>0.28 0.28 0.34</size></box></geometry>
+        <material>
+          <ambient>0.30 0.24 0.12 1</ambient>
+          <diffuse>0.58 0.46 0.22 1</diffuse>
+          <specular>0.35 0.32 0.22 1</specular>
+          <emissive>0.62 0.48 0.20 1</emissive>
+        </material>
+      </visual>
+      <visual name="lantern_cap_visual">
+        <pose>0 0 3.52 0 0 0</pose>
+        <geometry><box><size>0.38 0.38 0.09</size></box></geometry>
+        <material>
+          <ambient>0.025 0.028 0.026 1</ambient>
+          <diffuse>0.055 0.060 0.055 1</diffuse>
+          <specular>0.30 0.30 0.28 1</specular>
+        </material>
+      </visual>
+
+      <light name="warm_path_light" type="point">
+        <pose>0 0 3.30 0 0 0</pose>
+        <cast_shadows>true</cast_shadows>
+        <diffuse>0.72 0.58 0.34 1</diffuse>
+        <specular>0.16 0.13 0.08 1</specular>
+        <attenuation>
+          <range>8.0</range>
+          <constant>0.70</constant>
+          <linear>0.12</linear>
+          <quadratic>0.025</quadratic>
+        </attenuation>
+      </light>
+    </link>
+  </model>
+</sdf>

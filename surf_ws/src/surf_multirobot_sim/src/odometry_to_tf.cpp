@@ -17,7 +17,7 @@ public:
 
     std::vector<std::string> robot_names = {"humanoid", "drone"};
     for (const auto &robot_name : robot_names) {
-      const std::string odom_topic = "/" + robot_name + "/odom";
+      const std::string odom_topic = "/" + robot_name + "/lio/odom";
       subscriptions_.push_back(create_subscription<nav_msgs::msg::Odometry>(
         odom_topic,
         rclcpp::QoS(10),
