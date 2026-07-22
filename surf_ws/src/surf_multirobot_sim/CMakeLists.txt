@@ -44,7 +44,7 @@ install(
 )
 
 install(
-  DIRECTORY launch worlds models config maps
+  DIRECTORY launch models config maps
   DESTINATION share/${PROJECT_NAME}
 )
 

@@ -24,6 +24,7 @@
   <depend>surf_multirobot_msgs</depend>
   <exec_depend>surf_drone</exec_depend>
   <exec_depend>surf_humanoid</exec_depend>
+  <exec_depend>surf_gazebo_world</exec_depend>
   <exec_depend>fast_lio</exec_depend>
   <depend>tf2_geometry_msgs</depend>
 

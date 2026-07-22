@@ -1,8 +1,14 @@
+import os
 from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    SetEnvironmentVariable,
+    TimerAction,
+)
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
@@ -11,11 +17,22 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     package_share = Path(get_package_share_directory('surf_multirobot_sim'))
+    world_share = Path(get_package_share_directory('surf_gazebo_world'))
     drone_share = Path(get_package_share_directory('surf_drone'))
     humanoid_share = Path(get_package_share_directory('surf_humanoid'))
     ros_gz_share = Path(get_package_share_directory('ros_gz_sim'))
 
-    world_file = package_share / 'worlds' / 'outdoor.sdf'
+    world_file = world_share / 'worlds' / 'surf_world.sdf'
+    world_name = 'gtl_turtle_pond'
+    world_model_path = str(world_share / 'models')
+    gz_resource_path = world_model_path
+    existing_gz_resource_path = os.environ.get('GZ_SIM_RESOURCE_PATH')
+    if existing_gz_resource_path:
+        gz_resource_path += os.pathsep + existing_gz_resource_path
+    sdf_path = world_model_path
+    existing_sdf_path = os.environ.get('SDF_PATH')
+    if existing_sdf_path:
+        sdf_path += os.pathsep + existing_sdf_path
     robot_file = package_share / 'models' / 'diffbot' / 'model.sdf'
     bridge_file = package_share / 'config' / 'bridge.yaml'
     bonxai_file = package_share / 'config' / 'bonxai.yaml'
@@ -37,10 +54,10 @@ def generate_launch_description():
         executable='create',
         output='screen',
         arguments=[
-            '-world', 'outdoor',
+            '-world', world_name,
             '-name', 'humanoid',
             '-file', str(robot_file),
-            '-x', '-4.0', '-y', '-1.5', '-z', '0.001', '-Y', '0.0',
+            '-x', '11.5', '-y', '13.2', '-z', '0.06', '-Y', '-1.570796',
         ],
     )
 
@@ -49,10 +66,10 @@ def generate_launch_description():
         executable='create',
         output='screen',
         arguments=[
-            '-world', 'outdoor',
+            '-world', world_name,
             '-name', 'drone',
             '-file', str(robot_file),
-            '-x', '4.0', '-y', '1.5', '-z', '0.001', '-Y', '3.14159',
+            '-x', '16.5', '-y', '13.2', '-z', '0.06', '-Y', '-1.570796',
         ],
     )
 
@@ -221,6 +238,14 @@ def generate_launch_description():
         for robot_name in ('humanoid', 'drone')
     ]
 
+    odometry_tf = Node(
+        package='surf_multirobot_sim',
+        executable='odometry_to_tf',
+        name='odometry_to_tf',
+        output='screen',
+        parameters=[{'use_sim_time': True}],
+    )
+
     static_transforms = [
         Node(
             package='tf2_ros',
@@ -256,6 +281,8 @@ def generate_launch_description():
     ]
 
     return LaunchDescription([
+        SetEnvironmentVariable('GZ_SIM_RESOURCE_PATH', gz_resource_path),
+        SetEnvironmentVariable('SDF_PATH', sdf_path),
         DeclareLaunchArgument(
             'halow_trace', default_value='',
             description='CSV trace used to replay measured HaLow link conditions',
@@ -285,7 +312,7 @@ def generate_launch_description():
                 humanoid_receiver,
                 *link_emulators,
                 *fast_lio_nodes, *ground_truth_bridges,
-                *localization_nodes, *static_transforms,
+                *localization_nodes, odometry_tf, *static_transforms,
             ],
         ),
     ])

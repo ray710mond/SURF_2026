@@ -45,6 +45,12 @@ The launch file starts Gazebo, both robots, FAST-LIO for both roles, a local
 Bonxai server for each role, the drone sender, the humanoid receiver, and two
 one-way link emulators (HaLow realtime plus Wi-Fi synchronization).
 
+Gazebo loads the Caltech / Throop Memorial Garden environment from the separate
+`surf_gazebo_world` package. The robot simulation model remains defined in
+`surf_multirobot_sim/models/diffbot/model.sdf`; the launch file spawns it as the
+`humanoid` and `drone` directly south of the main building stairs, facing the
+entrance.
+
 The real-time path uses the HaLow profile with a freshness-first queue of depth
 two. Periodic full refreshes and retained deletion tombstones use the reliable
 5 GHz synchronization path.
@@ -196,6 +202,9 @@ In RViz:
   cells when sender and map resolutions differ.
 - Gazebo truth currently supplies each `map -> <role>/odom` correction. Replace
   `map_odom_localizer` with real global/cooperative localization on hardware.
+- FAST-LIO supplies each `<role>/odom -> <role>/base_link` transform. Gazebo
+  truth is paired with that same LIO odometry to calculate the simulation-only
+  `map -> <role>/odom` correction.
 - Bonxai's persistent map file belongs to the humanoid server. Drone map loading
   and saving are disabled so the two processes cannot overwrite the same file.
 
