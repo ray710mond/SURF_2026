@@ -146,6 +146,14 @@ def generate_launch_description():
         parameters=[str(humanoid_file)],
     )
 
+    data_tracker = Node(
+        package='surf_data_tracker',
+        executable='data_tracker',
+        name='data_tracker',
+        output='screen',
+        parameters=[{'use_sim_time': True}],
+    )
+
     def link_node(source, destination, radio, **profile):
         reliable = radio == 'wifi'
         return Node(
@@ -317,6 +325,7 @@ def generate_launch_description():
                 drone_map,
                 drone_sender,
                 humanoid_receiver,
+                data_tracker,
                 *link_emulators,
                 *fast_lio_nodes, *ground_truth_bridges,
                 *localization_nodes, odometry_tf, *static_transforms,

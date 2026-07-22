@@ -4,6 +4,7 @@
 #include <cmath>
 #include <condition_variable>
 #include <cstdint>
+#include <deque>
 #include <limits>
 #include <memory>
 #include <mutex>
@@ -16,6 +17,7 @@
 #include <vector>
 
 #include "geometry_msgs/msg/transform_stamped.hpp"
+#include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp/serialization.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
@@ -116,6 +118,17 @@ public:
       "link_metrics_topic", "/" + robot_name_ + "/comm/halow_metrics");
     metrics_topic_ = declare_parameter<std::string>(
       "metrics_topic", "/" + robot_name_ + "/comm/pipeline_metrics");
+    transform_source_ = declare_parameter<std::string>("pose_source.type", "tf");
+    odometry_topic_ = declare_parameter<std::string>(
+      "pose_source.odometry_topic", "/" + robot_name_ + "/odom");
+    odometry_parent_frame_ = declare_parameter<std::string>(
+      "pose_source.odometry_parent_frame", map_frame_);
+    base_frame_ = declare_parameter<std::string>(
+      "pose_source.base_frame", robot_name_ + "/base_link");
+    pose_max_age_ms_ = std::max(
+      0.0, declare_parameter<double>("pose_source.max_age_ms", 50.0));
+    transform_timeout_ms_ = std::max(
+      0.0, declare_parameter<double>("pose_source.tf_timeout_ms", 500.0));
 
     resolution_ = declare_parameter<double>("resolution", 0.20);
     min_range_ = declare_parameter<double>("filters.min_range", 0.75);
@@ -147,6 +160,19 @@ public:
 
     tf_buffer_ = std::make_shared<tf2_ros::Buffer>(get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+    if (transform_source_ == "odometry") {
+      odometry_subscription_ = create_subscription<nav_msgs::msg::Odometry>(
+        odometry_topic_, rclcpp::SensorDataQoS().keep_last(50),
+        [this](const nav_msgs::msg::Odometry::SharedPtr message) {
+          std::lock_guard<std::mutex> lock(odometry_mutex_);
+          odometry_history_.push_back(message);
+          while (odometry_history_.size() > 200U) {
+            odometry_history_.pop_front();
+          }
+        });
+    } else if (transform_source_ != "tf") {
+      throw std::invalid_argument("pose_source.type must be 'tf' or 'odometry'");
+    }
 
     const auto realtime_qos = rclcpp::QoS(rclcpp::KeepLast(2)).best_effort().durability_volatile();
     realtime_publisher_ = create_publisher<surf_multirobot_msgs::msg::CompressedVoxelDelta>(
@@ -192,6 +218,8 @@ public:
       "%s communication sender: %s -> [%s, %s], resolution %.2fm",
       robot_name_.c_str(), input_topic_.c_str(), realtime_topic_.c_str(), sync_topic_.c_str(),
       resolution_);
+    RCLCPP_INFO(get_logger(), "Pose source: %s%s", transform_source_.c_str(),
+      transform_source_ == "odometry" ? (" on " + odometry_topic_).c_str() : "");
   }
 
   ~DroneScanSender() override
@@ -327,14 +355,13 @@ private:
     const auto processing_start = std::chrono::steady_clock::now();
     geometry_msgs::msg::TransformStamped transform;
     try {
-      transform = tf_buffer_->lookupTransform(
-        map_frame_, cloud.header.frame_id, cloud.header.stamp,
-        rclcpp::Duration::from_seconds(0.5));
+      transform = resolve_transform(cloud);
     } catch (const tf2::TransformException & exception) {
       RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
         "Communication filter cannot transform cloud: %s", exception.what());
       return;
     }
+    const auto transform_complete = std::chrono::steady_clock::now();
 
     tf2::Quaternion rotation;
     tf2::fromMsg(transform.transform.rotation, rotation);
@@ -374,6 +401,7 @@ private:
         exception.what());
       return;
     }
+    const auto point_preprocessing_complete = std::chrono::steady_clock::now();
 
     rclcpp::Serialization<sensor_msgs::msg::PointCloud2> cloud_serializer;
     rclcpp::SerializedMessage serialized_cloud;
@@ -394,10 +422,16 @@ private:
       static_snapshot = static_map_;
     }
 
+    const auto occupancy_selection_start = std::chrono::steady_clock::now();
+    uint32_t static_prior_voxels = 0U;
+
     for (const auto & coord : current) {
       tombstones_.erase(coord);
       auto & cell = cells_[coord];
       const bool represented_by_prior = static_snapshot.find(coord) != static_snapshot.end();
+      if (represented_by_prior) {
+        ++static_prior_voxels;
+      }
       if (cell.last_seen_version + 1U == version_) {
         ++cell.consecutive_hits;
       } else {
@@ -428,6 +462,7 @@ private:
         cell.last_sent_static = cell.static_known;
       }
     }
+    const auto occupancy_selection_complete = std::chrono::steady_clock::now();
 
     std::unordered_set<Coord, CoordHash> traversed_known;
     const std::size_t maximum_clear_rays = static_cast<std::size_t>(maximum_clear_rays_);
@@ -483,10 +518,25 @@ private:
       }
       it = cells_.erase(it);
     }
+    const auto clearing_complete = std::chrono::steady_clock::now();
+
+    const float transform_lookup_ms = static_cast<float>(
+      std::chrono::duration<double, std::milli>(transform_complete - processing_start).count());
+    const float point_preprocessing_ms = static_cast<float>(
+      std::chrono::duration<double, std::milli>(
+        point_preprocessing_complete - transform_complete).count());
+    const float occupancy_selection_ms = static_cast<float>(
+      std::chrono::duration<double, std::milli>(
+        occupancy_selection_complete - occupancy_selection_start).count());
+    const float clearing_ms = static_cast<float>(
+      std::chrono::duration<double, std::milli>(
+        clearing_complete - occupancy_selection_complete).count());
 
     publish_delta(realtime,
       surf_multirobot_msgs::msg::CompressedVoxelDelta::TRAFFIC_REALTIME,
-      *realtime_publisher_, raw_serialized_bytes, raw_points, valid_points, processing_start);
+      *realtime_publisher_, raw_serialized_bytes, raw_points, valid_points,
+      static_cast<uint32_t>(current.size()), static_prior_voxels, processing_start,
+      transform_lookup_ms, point_preprocessing_ms, occupancy_selection_ms, clearing_ms);
 
     const double now = steady_seconds();
     if (sync_interval_seconds_ > 0.0 && now - last_sync_time_ >= sync_interval_seconds_) {
@@ -508,9 +558,58 @@ private:
         ++it;
       }
       publish_delta(sync, surf_multirobot_msgs::msg::CompressedVoxelDelta::TRAFFIC_SYNC,
-        *sync_publisher_, 0U, 0U, 0U, processing_start);
+        *sync_publisher_, 0U, 0U, 0U, static_cast<uint32_t>(current.size()),
+        static_prior_voxels, processing_start, transform_lookup_ms,
+        point_preprocessing_ms, occupancy_selection_ms, clearing_ms);
       last_sync_time_ = now;
     }
+  }
+
+  geometry_msgs::msg::TransformStamped resolve_transform(
+    const sensor_msgs::msg::PointCloud2 & cloud)
+  {
+    const auto timeout = rclcpp::Duration::from_seconds(transform_timeout_ms_ / 1000.0);
+    if (transform_source_ == "tf") {
+      return tf_buffer_->lookupTransform(
+        map_frame_, cloud.header.frame_id, cloud.header.stamp, timeout);
+    }
+
+    nav_msgs::msg::Odometry::SharedPtr nearest;
+    int64_t nearest_difference_ns = std::numeric_limits<int64_t>::max();
+    const rclcpp::Time cloud_stamp(cloud.header.stamp);
+    {
+      std::lock_guard<std::mutex> lock(odometry_mutex_);
+      for (const auto & candidate : odometry_history_) {
+        const int64_t difference = std::llabs(
+          (rclcpp::Time(candidate->header.stamp) - cloud_stamp).nanoseconds());
+        if (difference < nearest_difference_ns) {
+          nearest_difference_ns = difference;
+          nearest = candidate;
+        }
+      }
+    }
+    if (!nearest || static_cast<double>(nearest_difference_ns) / 1.0e6 > pose_max_age_ms_) {
+      throw tf2::TransformException("No odometry sample close enough to point-cloud timestamp");
+    }
+    if (!nearest->header.frame_id.empty() && nearest->header.frame_id != odometry_parent_frame_) {
+      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
+        "Using odometry pose as %s although message frame is %s",
+        odometry_parent_frame_.c_str(), nearest->header.frame_id.c_str());
+    }
+
+    const auto base_to_sensor_message = tf_buffer_->lookupTransform(
+      base_frame_, cloud.header.frame_id,
+      rclcpp::Time(0, 0, get_clock()->get_clock_type()), timeout);
+    tf2::Transform parent_to_base;
+    tf2::fromMsg(nearest->pose.pose, parent_to_base);
+    tf2::Transform base_to_sensor;
+    tf2::fromMsg(base_to_sensor_message.transform, base_to_sensor);
+    geometry_msgs::msg::TransformStamped result;
+    result.header.stamp = cloud.header.stamp;
+    result.header.frame_id = odometry_parent_frame_;
+    result.child_frame_id = cloud.header.frame_id;
+    result.transform = tf2::toMsg(parent_to_base * base_to_sensor);
+    return result;
   }
 
   void initialize_delta(
@@ -532,7 +631,10 @@ private:
     surf_multirobot_msgs::msg::VoxelDelta & delta, uint8_t traffic_class,
     rclcpp::Publisher<surf_multirobot_msgs::msg::CompressedVoxelDelta> & publisher,
     std::size_t raw_bytes, uint32_t raw_points, uint32_t valid_points,
-    const std::chrono::steady_clock::time_point & processing_start)
+    uint32_t unique_voxels, uint32_t static_prior_voxels,
+    const std::chrono::steady_clock::time_point & processing_start,
+    float transform_lookup_ms, float point_preprocessing_ms,
+    float occupancy_selection_ms, float clearing_ms)
   {
     surf_multirobot_msgs::msg::CompressedVoxelDelta wire;
     const auto compression_start = std::chrono::steady_clock::now();
@@ -565,14 +667,25 @@ private:
     }
     metrics.raw_points = raw_points;
     metrics.valid_points = valid_points;
+    metrics.unique_voxels = unique_voxels;
+    metrics.static_prior_voxels = static_prior_voxels;
     metrics.selected_voxels = static_cast<uint32_t>(delta.x.size());
+    const uint32_t after_static = unique_voxels > static_prior_voxels ?
+      unique_voxels - static_prior_voxels : 0U;
+    metrics.temporal_suppressed_voxels = after_static > metrics.selected_voxels ?
+      after_static - metrics.selected_voxels : 0U;
     metrics.raw_serialized_bytes = static_cast<uint32_t>(raw_bytes);
     metrics.uncompressed_bytes = wire.uncompressed_bytes;
     metrics.payload_bytes = static_cast<uint32_t>(wire.payload.size());
     metrics.wire_bytes = wire_bytes;
+    metrics.codec = wire.codec;
     metrics.compression_ratio = !wire.payload.empty() ?
       static_cast<float>(wire.uncompressed_bytes) / wire.payload.size() : 0.0F;
     metrics.compression_latency_ms = compression_latency_ms;
+    metrics.transform_lookup_ms = transform_lookup_ms;
+    metrics.point_preprocessing_ms = point_preprocessing_ms;
+    metrics.occupancy_selection_ms = occupancy_selection_ms;
+    metrics.clearing_ms = clearing_ms;
     for (const uint8_t state : delta.state) {
       if (state == surf_multirobot_msgs::msg::VoxelDelta::STATE_FREE) {
         ++metrics.free_updates;
@@ -600,6 +713,12 @@ private:
   std::string sync_topic_;
   std::string link_metrics_topic_;
   std::string metrics_topic_;
+  std::string transform_source_;
+  std::string odometry_topic_;
+  std::string odometry_parent_frame_;
+  std::string base_frame_;
+  double pose_max_age_ms_{50.0};
+  double transform_timeout_ms_{500.0};
   double resolution_{0.2};
   double min_range_{0.75};
   double max_range_{50.0};
@@ -650,6 +769,9 @@ private:
 
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+  std::mutex odometry_mutex_;
+  std::deque<nav_msgs::msg::Odometry::SharedPtr> odometry_history_;
+  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_subscription_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_subscription_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr static_map_subscription_;
   rclcpp::Subscription<surf_multirobot_msgs::msg::LinkMetrics>::SharedPtr

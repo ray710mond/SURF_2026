@@ -8,6 +8,15 @@
     sync_topic: /drone/comm/wifi_tx
     link_metrics_topic: /drone/comm/halow_metrics
     metrics_topic: /drone/comm/pipeline_metrics
+    # "odometry" avoids waiting for Fast-LIO TF in simulation. On hardware,
+    # either point this at the vehicle odometry topic or use "tf".
+    pose_source:
+      type: odometry
+      odometry_topic: /drone/odom
+      odometry_parent_frame: map
+      base_frame: drone/base_link
+      max_age_ms: 50.0
+      tf_timeout_ms: 50.0
     resolution: 0.20
     compression_level: 1
     delta_refresh_scans: 50

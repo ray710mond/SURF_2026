@@ -5,6 +5,9 @@ uint8 traffic_class
 float32 input_rate_hz
 uint32 raw_points
 uint32 valid_points
+uint32 unique_voxels
+uint32 static_prior_voxels
+uint32 temporal_suppressed_voxels
 uint32 selected_voxels
 uint32 occupied_updates
 uint32 free_updates
@@ -13,8 +16,13 @@ uint32 raw_serialized_bytes
 uint32 uncompressed_bytes
 uint32 payload_bytes
 uint32 wire_bytes
+string codec
 float32 compression_ratio
 float32 compression_latency_ms
+float32 transform_lookup_ms
+float32 point_preprocessing_ms
+float32 occupancy_selection_ms
+float32 clearing_ms
 float32 processing_latency_ms
 uint64 cumulative_raw_bytes
 uint64 cumulative_wire_bytes
