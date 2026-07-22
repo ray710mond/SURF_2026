@@ -55,6 +55,16 @@ The real-time path uses the HaLow profile with a freshness-first queue of depth
 two. Periodic full refreshes and retained deletion tombstones use the reliable
 5 GHz synchronization path.
 
+Link bandwidth varies with the 3D distance between the robots. The configured
+`bandwidth_mbps` is the rate at `reference_distance_m` (5 m in this launch), and
+the emulator applies `bandwidth = reference_bandwidth * (reference_distance /
+distance)^2`. `minimum_distance_m` prevents a singularity when robots overlap,
+and `minimum_bandwidth_mbps` keeps transmission times finite at long range.
+`maximum_bandwidth_mbps` caps the result at the radio's nominal peak rate, so
+moving closer than the reference distance cannot produce unlimited bandwidth.
+When a link trace is enabled, each trace bandwidth is treated as the reference
+bandwidth before distance scaling.
+
 ## Verify
 
 ```bash
