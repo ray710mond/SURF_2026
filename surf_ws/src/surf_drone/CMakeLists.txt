@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(ament_cmake REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(surf_multirobot_msgs REQUIRED)
@@ -28,7 +29,7 @@ target_link_libraries(drone_communication_core PUBLIC zstd::zstd)
 
 add_executable(drone_scan_sender src/drone_scan_sender.cpp)
 ament_target_dependencies(drone_scan_sender
-  geometry_msgs rclcpp sensor_msgs surf_multirobot_msgs tf2 tf2_geometry_msgs tf2_ros)
+  geometry_msgs nav_msgs rclcpp sensor_msgs surf_multirobot_msgs tf2 tf2_geometry_msgs tf2_ros)
 target_link_libraries(drone_scan_sender drone_communication_core Threads::Threads)
 
 install(TARGETS drone_communication_core drone_scan_sender

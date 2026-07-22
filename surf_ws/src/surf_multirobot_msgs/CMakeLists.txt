@@ -8,6 +8,7 @@ find_package(std_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/CompressedVoxelDelta.msg"
+  "msg/DeliveryMetrics.msg"
   "msg/LinkMetrics.msg"
   "msg/PipelineMetrics.msg"
   "msg/VoxelDelta.msg"
