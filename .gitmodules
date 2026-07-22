@@ -1,6 +1,6 @@
 [submodule "surf_ws/src/fast_lio"]
 	path = surf_ws/src/fast_lio
-	url = https://github.com/Ericsii/FAST_LIO_ROS2.git
+	url = https://github.com/ray710mond/FAST_LIO_ROS2.git
 [submodule "surf_ws/src/rolling_bonxai"]
 	path = surf_ws/src/rolling_bonxai
 	url = https://github.com/ray710mond/Rolling-Bonxai.git
