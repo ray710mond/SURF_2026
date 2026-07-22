@@ -29,7 +29,7 @@ add_executable(map_odom_localizer src/map_odom_localizer.cpp)
 ament_target_dependencies(map_odom_localizer rclcpp nav_msgs tf2 tf2_geometry_msgs tf2_msgs tf2_ros)
 
 add_executable(link_emulator src/link_emulator.cpp)
-ament_target_dependencies(link_emulator rclcpp surf_multirobot_msgs)
+ament_target_dependencies(link_emulator nav_msgs rclcpp surf_multirobot_msgs)
 
 install(
   TARGETS

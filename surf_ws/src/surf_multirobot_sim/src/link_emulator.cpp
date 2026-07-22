@@ -15,6 +15,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp/serialization.hpp"
 
+#include "nav_msgs/msg/odometry.hpp"
 #include "surf_multirobot_msgs/msg/compressed_voxel_delta.hpp"
 #include "surf_multirobot_msgs/msg/link_metrics.hpp"
 
@@ -31,7 +32,18 @@ public:
     input_topic_ = declare_parameter<std::string>("input_topic", "/comm/tx");
     output_topic_ = declare_parameter<std::string>("output_topic", "/comm/rx");
     metrics_topic_ = declare_parameter<std::string>("metrics_topic", "/comm/link_metrics");
+    source_odom_topic_ = declare_parameter<std::string>("source_odom_topic", "");
+    destination_odom_topic_ = declare_parameter<std::string>("destination_odom_topic", "");
     profile_.bandwidth_mbps = declare_parameter<double>("bandwidth_mbps", 4.0);
+    reference_distance_m_ = std::max(
+      1.0e-3, declare_parameter<double>("reference_distance_m", 1.0));
+    minimum_distance_m_ = std::max(
+      1.0e-3, declare_parameter<double>("minimum_distance_m", 0.25));
+    minimum_bandwidth_mbps_ = std::max(
+      1.0e-6, declare_parameter<double>("minimum_bandwidth_mbps", 0.01));
+    maximum_bandwidth_mbps_ = std::max(
+      minimum_bandwidth_mbps_,
+      declare_parameter<double>("maximum_bandwidth_mbps", profile_.bandwidth_mbps));
     profile_.latency_ms = declare_parameter<double>("latency_ms", 25.0);
     profile_.jitter_ms = declare_parameter<double>("jitter_ms", 5.0);
     profile_.loss_percent = declare_parameter<double>("loss_percent", 0.5);
@@ -64,6 +76,22 @@ public:
       std::bind(&LinkEmulator::packet_callback, this, std::placeholders::_1));
     metrics_publisher_ = create_publisher<surf_multirobot_msgs::msg::LinkMetrics>(
       metrics_topic_, rclcpp::QoS(10));
+    if (!source_odom_topic_.empty() && !destination_odom_topic_.empty()) {
+      source_odom_subscription_ = create_subscription<nav_msgs::msg::Odometry>(
+        source_odom_topic_, rclcpp::SensorDataQoS(),
+        [this](const nav_msgs::msg::Odometry::SharedPtr odometry) {
+          std::lock_guard<std::mutex> lock(mutex_);
+          source_position_ = position_from(*odometry);
+          have_source_position_ = true;
+        });
+      destination_odom_subscription_ = create_subscription<nav_msgs::msg::Odometry>(
+        destination_odom_topic_, rclcpp::SensorDataQoS(),
+        [this](const nav_msgs::msg::Odometry::SharedPtr odometry) {
+          std::lock_guard<std::mutex> lock(mutex_);
+          destination_position_ = position_from(*odometry);
+          have_destination_position_ = true;
+        });
+    }
 
     delivery_timer_ = create_wall_timer(
       std::chrono::milliseconds(1), std::bind(&LinkEmulator::deliver_ready, this));
@@ -71,9 +99,10 @@ public:
       std::chrono::seconds(1), std::bind(&LinkEmulator::publish_metrics, this));
 
     RCLCPP_INFO(get_logger(),
-      "%s link: %s -> %s at %.3f Mbps, %.1f ms, %.2f%% loss%s",
+      "%s link: %s -> %s at %.3f Mbps at %.1fm, %.1f ms, %.2f%% loss%s",
       link_name_.c_str(), input_topic_.c_str(), output_topic_.c_str(),
-      profile_.bandwidth_mbps, profile_.latency_ms, profile_.loss_percent,
+      profile_.bandwidth_mbps, reference_distance_m_, profile_.latency_ms,
+      profile_.loss_percent,
       trace_.empty() ? "" : " (trace replay enabled)");
   }
 
@@ -102,6 +131,35 @@ private:
     SteadyTime delivery;
     std::size_t accounted_bytes{0U};
   };
+
+  struct Position
+  {
+    double x{0.0};
+    double y{0.0};
+    double z{0.0};
+  };
+
+  static Position position_from(const nav_msgs::msg::Odometry & odometry)
+  {
+    const auto & position = odometry.pose.pose.position;
+    return {position.x, position.y, position.z};
+  }
+
+  double effective_bandwidth_mbps() const
+  {
+    if (!have_source_position_ || !have_destination_position_) {
+      return std::clamp(
+        profile_.bandwidth_mbps, minimum_bandwidth_mbps_, maximum_bandwidth_mbps_);
+    }
+    const double dx = source_position_.x - destination_position_.x;
+    const double dy = source_position_.y - destination_position_.y;
+    const double dz = source_position_.z - destination_position_.z;
+    const double distance = std::max(minimum_distance_m_, std::sqrt(dx * dx + dy * dy + dz * dz));
+    const double distance_ratio = reference_distance_m_ / distance;
+    return std::clamp(
+      profile_.bandwidth_mbps * distance_ratio * distance_ratio,
+      minimum_bandwidth_mbps_, maximum_bandwidth_mbps_);
+  }
 
   void load_trace()
   {
@@ -191,7 +249,7 @@ private:
     }
 
     const std::size_t bytes = serialized_size(*message);
-    const double bandwidth_bps = std::max(1.0, profile_.bandwidth_mbps * 1.0e6);
+    const double bandwidth_bps = effective_bandwidth_mbps() * 1.0e6;
     const double transmit_seconds = static_cast<double>(bytes) * 8.0 / bandwidth_bps;
     const SteadyTime transmit_start = std::max(now, next_transmit_time_);
     next_transmit_time_ = transmit_start + std::chrono::duration_cast<SteadyTime::duration>(
@@ -238,7 +296,7 @@ private:
         1.0e-6, std::chrono::duration<double>(now_steady - window_start_).count());
       metrics.header.stamp = now();
       metrics.link_name = link_name_;
-      metrics.configured_bandwidth_mbps = static_cast<float>(profile_.bandwidth_mbps);
+      metrics.configured_bandwidth_mbps = static_cast<float>(effective_bandwidth_mbps());
       metrics.configured_latency_ms = static_cast<float>(profile_.latency_ms);
       metrics.configured_jitter_ms = static_cast<float>(profile_.jitter_ms);
       metrics.configured_loss_percent = static_cast<float>(profile_.loss_percent);
@@ -262,6 +320,8 @@ private:
   std::string input_topic_;
   std::string output_topic_;
   std::string metrics_topic_;
+  std::string source_odom_topic_;
+  std::string destination_odom_topic_;
   std::string trace_path_;
   Profile profile_;
   std::vector<TraceRow> trace_;
@@ -270,6 +330,14 @@ private:
   bool freshness_first_{true};
   bool reliable_qos_{false};
   int packet_overhead_bytes_{96};
+  double reference_distance_m_{1.0};
+  double minimum_distance_m_{0.25};
+  double minimum_bandwidth_mbps_{0.01};
+  double maximum_bandwidth_mbps_{4.0};
+  Position source_position_;
+  Position destination_position_;
+  bool have_source_position_{false};
+  bool have_destination_position_{false};
 
   std::mutex mutex_;
   std::deque<PendingPacket> queue_;
@@ -291,6 +359,8 @@ private:
   rclcpp::Subscription<surf_multirobot_msgs::msg::CompressedVoxelDelta>::SharedPtr subscription_;
   rclcpp::Publisher<surf_multirobot_msgs::msg::CompressedVoxelDelta>::SharedPtr publisher_;
   rclcpp::Publisher<surf_multirobot_msgs::msg::LinkMetrics>::SharedPtr metrics_publisher_;
+  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr source_odom_subscription_;
+  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr destination_odom_subscription_;
   rclcpp::TimerBase::SharedPtr delivery_timer_;
   rclcpp::TimerBase::SharedPtr metrics_timer_;
 };

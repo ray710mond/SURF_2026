@@ -158,8 +158,13 @@ def generate_launch_description():
                 'input_topic': f'/{source}/comm/{radio}_tx',
                 'output_topic': f'/{destination}/comm/{radio}_rx',
                 'metrics_topic': f'/{source}/comm/{radio}_metrics',
+                'source_odom_topic': f'/{source}/odom',
+                'destination_odom_topic': f'/{destination}/odom',
                 'trace_path': LaunchConfiguration(f'{radio}_trace'),
                 'reliable_qos': reliable,
+                'reference_distance_m': 5.0,
+                'minimum_distance_m': 0.5,
+                'minimum_bandwidth_mbps': 0.01,
                 **profile,
             }],
         )
@@ -167,11 +172,13 @@ def generate_launch_description():
     link_emulators = [
         link_node(
             'drone', 'humanoid', 'halow', bandwidth_mbps=4.0,
+            maximum_bandwidth_mbps=4.0,
             latency_ms=25.0, jitter_ms=5.0, loss_percent=0.5,
             queue_depth=2, freshness_first=True,
         ),
         link_node(
             'drone', 'humanoid', 'wifi', bandwidth_mbps=80.0,
+            maximum_bandwidth_mbps=80.0,
             latency_ms=8.0, jitter_ms=2.0, loss_percent=0.1,
             queue_depth=20, freshness_first=False,
         ),
