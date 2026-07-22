@@ -1,0 +1,8 @@
+/**/drone_data_receiver:
+  ros__parameters:
+    use_sim_time: true
+    robot_name: humanoid
+    realtime_topic: /humanoid/comm/halow_rx
+    sync_topic: /humanoid/comm/wifi_rx
+    output_topic: /humanoid/comm/drone_voxel_delta
+    maximum_uncompressed_bytes: 67108864

@@ -1,10 +1,10 @@
-#include "surf_multirobot_sim/adaptive_mode.hpp"
+#include "surf_drone/adaptive_mode.hpp"
 
 #include <algorithm>
 
 #include "surf_multirobot_msgs/msg/voxel_delta.hpp"
 
-namespace surf_multirobot_sim
+namespace surf_drone
 {
 
 AdaptiveModeController::AdaptiveModeController()
@@ -80,4 +80,4 @@ uint8_t AdaptiveModeController::update(
   return mode_;
 }
 
-}  // namespace surf_multirobot_sim
+}  // namespace surf_drone

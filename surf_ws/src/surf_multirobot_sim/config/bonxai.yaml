@@ -25,8 +25,7 @@
     map_storage:
       path: /home/raymond/SURF_2026/surf_ws/src/surf_multirobot_sim/maps/static_map.bonxai
       load_on_startup: true
-      # Both robot-local servers currently share this path. On shutdown, the
-      # last server to finish determines the persisted map.
+      # Launch overrides persistence for the drone-local visualization map.
       save_on_shutdown: true
 
     stats:

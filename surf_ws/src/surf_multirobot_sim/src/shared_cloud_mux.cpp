@@ -14,8 +14,8 @@ public:
     publisher_ = create_publisher<sensor_msgs::msg::PointCloud2>(
       output_topic_, rclcpp::SensorDataQoS());
 
-    robot1_subscription_ = subscribe("/robot1/points");
-    robot2_subscription_ = subscribe("/robot2/points");
+    humanoid_subscription_ = subscribe("/humanoid/points");
+    drone_subscription_ = subscribe("/drone/points");
   }
 
 private:
@@ -33,8 +33,8 @@ private:
 
   std::string output_topic_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr publisher_;
-  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr robot1_subscription_;
-  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr robot2_subscription_;
+  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr humanoid_subscription_;
+  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr drone_subscription_;
 };
 
 int main(int argc, char ** argv)

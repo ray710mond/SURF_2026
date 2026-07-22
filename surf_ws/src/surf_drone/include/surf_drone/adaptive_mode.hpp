@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace surf_multirobot_sim
+namespace surf_drone
 {
 
 class AdaptiveModeController
@@ -40,4 +40,4 @@ private:
   uint8_t candidate_mode_{1};
 };
 
-}  // namespace surf_multirobot_sim
+}  // namespace surf_drone

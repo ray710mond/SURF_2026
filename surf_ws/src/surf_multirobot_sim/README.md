@@ -1,8 +1,9 @@
 # SURF multi-robot mapping and communication simulation
 
-Two differential-drive robots, each carrying a 16-layer 3D GPU LiDAR, maintain
-robot-local Bonxai maps and exchange selected voxel-map changes over emulated
-Wi-Fi HaLow and 5 GHz Wi-Fi links.
+Two differential-drive simulation models stand in for the future `humanoid`
+and `drone` hardware. Only drone LiDAR data is filtered, voxelized, compressed,
+and transmitted. The humanoid decompresses that stream and fuses it with its
+own direct LiDAR input in one Bonxai map.
 
 Target platform:
 
@@ -40,8 +41,9 @@ Replace the placeholder maintainer email in `package.xml` whenever convenient.
 ros2 launch surf_multirobot_sim two_robots.launch.py
 ```
 
-The launch file starts Gazebo, both robots, FAST-LIO, two local Bonxai servers,
-the communication senders and receivers, and four directional link emulators.
+The launch file starts Gazebo, both robots, FAST-LIO for both roles, a local
+Bonxai server for each role, the drone sender, the humanoid receiver, and two
+one-way link emulators (HaLow realtime plus Wi-Fi synchronization).
 
 The real-time path uses the HaLow profile with a freshness-first queue of depth
 two. Periodic full refreshes and retained deletion tombstones use the reliable
@@ -50,47 +52,48 @@ two. Periodic full refreshes and retained deletion tombstones use the reliable
 ## Verify
 
 ```bash
-ros2 topic list | grep -E 'robot1|robot2'
-ros2 topic hz /robot1/points
-ros2 topic hz /robot2/points
-ros2 topic echo /robot1/odom --once
-ros2 topic echo /robot1/comm/pipeline_metrics --once
-ros2 topic echo /robot1/comm/halow_metrics --once
-ros2 topic bw /robot1/points
-ros2 topic bw /robot1/comm/halow_tx
+ros2 topic list | grep -E 'humanoid|drone'
+ros2 topic hz /humanoid/points
+ros2 topic hz /drone/points
+ros2 topic echo /humanoid/odom --once
+ros2 topic echo /drone/comm/pipeline_metrics --once
+ros2 topic echo /drone/comm/halow_metrics --once
+ros2 topic bw /humanoid/points
+ros2 topic bw /drone/comm/halow_tx
+ros2 topic echo /humanoid/comm/drone_voxel_delta --once
 ```
 
 Gazebo-side check:
 
 ```bash
-gz topic -l | grep -E 'robot1|robot2' | grep -E 'cmd_vel|odometry|points'
+gz topic -l | grep -E 'humanoid|drone' | grep -E 'cmd_vel|odometry|points'
 ```
 
 ## Drive the robots
 
-Robot 1:
+Humanoid:
 
 ```bash
 ros2 run teleop_twist_keyboard teleop_twist_keyboard \
-  --ros-args -r cmd_vel:=/robot1/cmd_vel
+  --ros-args -r cmd_vel:=/humanoid/cmd_vel
 ```
 
-Robot 2, in another terminal:
+Drone, in another terminal:
 
 ```bash
 ros2 run teleop_twist_keyboard teleop_twist_keyboard \
-  --ros-args -r cmd_vel:=/robot2/cmd_vel
+  --ros-args -r cmd_vel:=/drone/cmd_vel
 ```
 
 ## Communication architecture
 
 ```text
-robot1 LiDAR -> robot1 local Bonxai
-             -> voxel selector -> SVD1/zstd -> HaLow emulator ----+
-             -> periodic refresh -> SVD1/zstd -> Wi-Fi emulator --+-> robot2 receiver
-                                                              -> robot2 local Bonxai
-
-robot2 uses the same paths in the opposite direction.
+drone LiDAR -> filters/voxel selector -> SVD1/zstd
+                                     +-> HaLow emulator --+
+                                     +-> Wi-Fi emulator ---+
+                                                         v
+humanoid LiDAR -------------------------------> humanoid Bonxai map
+humanoid receiver -> decoded drone deltas ---> humanoid Bonxai map
 ```
 
 The sparse protocol is defined in `surf_multirobot_msgs`. Every packet carries
@@ -102,7 +105,7 @@ mode, traffic class, and encoded payload. Decoded records explicitly encode:
 - observed free voxels;
 - deletion/reset tombstones.
 
-The sender filters invalid, out-of-range, self, vertically excluded, duplicate,
+The drone sender filters invalid, out-of-range, self, vertically excluded, duplicate,
 static-map-redundant, and unchanged voxels. A completed scan is processed by a
 background worker while the ROS callback retains only the newest waiting scan.
 Unseen dynamic cells expire after `dynamic_retention_scans` and become retained
@@ -167,29 +170,34 @@ In RViz:
 1. Set **Fixed Frame** to `world`.
 2. Add a **TF** display.
 3. Add **PointCloud2** displays.
-4. Select `/robot1/bonxai/occupied_voxels` and
-   `/robot2/bonxai/occupied_voxels` for the independently maintained maps.
+4. Select `/humanoid/bonxai/occupied_voxels` for the humanoid's fused local and
+   drone-assisted map, and `/drone/bonxai/occupied_voxels` for the drone's
+   complete local map. Raw scans remain separately available as `/humanoid/points`
+   and `/drone/points`.
 5. Set PointCloud2 **Style** to `Points` and increase **Size (Pixels)** if needed.
 
 ## Important implementation details
 
 - The robot SDF does not hard-code command, odometry, or LiDAR topic names.
-- Gazebo scopes those topics using the spawned model name, so the same SDF can be spawned as `robot1` and `robot2`.
+- Gazebo scopes those topics using the spawned model name, so the same SDF can be spawned as `humanoid` and `drone`.
 - The GPU LiDAR publishes a laser scan and a point-cloud topic ending in `/scan/points`.
-- `bridge.yaml` maps those verbose Gazebo topics to `/robot1/points` and `/robot2/points`.
-- Each Bonxai server consumes its own sensor directly and applies remote
-  occupied/free/delete deltas through a typed ingress—not a reconstructed fake
-  point cloud. Remote evidence is isolated by source and only unioned for fused
-  outputs, so a remote delete cannot erase locally observed occupancy.
+- `bridge.yaml` maps those verbose Gazebo topics to `/humanoid/points` and `/drone/points`.
+- The humanoid Bonxai server consumes `/humanoid/points` directly and applies
+  decoded drone occupied/free/delete deltas through its typed ingress—not a
+  reconstructed fake point cloud. Remote evidence is isolated by source and
+  unioned for fused outputs, so a drone delete cannot erase humanoid evidence.
+- The drone Bonxai server consumes every `/drone/points` scan locally and does
+  not ingest remote deltas. Its local map is independent of the communication
+  sender; only selected delta records are compressed and transmitted.
 - Every sender epoch starts with a reliable full refresh. Later full refreshes
   atomically replace that source's layer, which reconciles packet loss and
   removes state absent from the snapshot.
 - Coarser communication voxels are expanded across all covered local Bonxai
   cells when sender and map resolutions differ.
-- Gazebo truth currently supplies each `map -> robotN/odom` correction. Replace
+- Gazebo truth currently supplies each `map -> <role>/odom` correction. Replace
   `map_odom_localizer` with real global/cooperative localization on hardware.
-- Bonxai's persistent map file is loaded by both local servers but is not saved
-  automatically, preventing two processes from writing the same file.
+- Bonxai's persistent map file belongs to the humanoid server. Drone map loading
+  and saving are disabled so the two processes cannot overwrite the same file.
 
 ## Performance tuning
 

@@ -8,7 +8,7 @@
 #include "surf_multirobot_msgs/msg/compressed_voxel_delta.hpp"
 #include "surf_multirobot_msgs/msg/voxel_delta.hpp"
 
-namespace surf_multirobot_sim
+namespace surf_drone
 {
 
 struct CodecResult
@@ -27,4 +27,4 @@ CodecResult decode_delta(
   surf_multirobot_msgs::msg::VoxelDelta & delta,
   std::size_t maximum_uncompressed_bytes = 64U * 1024U * 1024U);
 
-}  // namespace surf_multirobot_sim
+}  // namespace surf_drone

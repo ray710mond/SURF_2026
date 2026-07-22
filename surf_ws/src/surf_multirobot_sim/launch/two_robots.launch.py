@@ -11,13 +11,16 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     package_share = Path(get_package_share_directory('surf_multirobot_sim'))
+    drone_share = Path(get_package_share_directory('surf_drone'))
+    humanoid_share = Path(get_package_share_directory('surf_humanoid'))
     ros_gz_share = Path(get_package_share_directory('ros_gz_sim'))
 
     world_file = package_share / 'worlds' / 'outdoor.sdf'
     robot_file = package_share / 'models' / 'diffbot' / 'model.sdf'
     bridge_file = package_share / 'config' / 'bridge.yaml'
     bonxai_file = package_share / 'config' / 'bonxai.yaml'
-    communication_file = package_share / 'config' / 'communication.yaml'
+    drone_file = drone_share / 'config' / 'drone.yaml'
+    humanoid_file = humanoid_share / 'config' / 'humanoid.yaml'
     fast_lio_file = package_share / 'config' / 'fast_lio_sim.yaml'
 
     gazebo = IncludeLaunchDescription(
@@ -29,25 +32,25 @@ def generate_launch_description():
         }.items(),
     )
 
-    robot1 = Node(
+    humanoid = Node(
         package='ros_gz_sim',
         executable='create',
         output='screen',
         arguments=[
             '-world', 'outdoor',
-            '-name', 'robot1',
+            '-name', 'humanoid',
             '-file', str(robot_file),
             '-x', '-4.0', '-y', '-1.5', '-z', '0.001', '-Y', '0.0',
         ],
     )
 
-    robot2 = Node(
+    drone = Node(
         package='ros_gz_sim',
         executable='create',
         output='screen',
         arguments=[
             '-world', 'outdoor',
-            '-name', 'robot2',
+            '-name', 'drone',
             '-file', str(robot_file),
             '-x', '4.0', '-y', '1.5', '-z', '0.001', '-Y', '3.14159',
         ],
@@ -74,49 +77,57 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration('use_rviz')),
     )
 
-    bonxai_nodes = [
-        Node(
-            package='bonxai_ros',
-            executable='bonxai_server_node',
-            namespace=robot_name,
-            name='bonxai_server_node',
-            output='screen',
-            parameters=[
-                str(bonxai_file),
-                {
-                    'topic_in': f'/{robot_name}/points',
-                    'delta_topic_in': f'/{robot_name}/comm/voxel_delta',
-                    'map_storage.path': str(package_share / 'maps' / 'static_map.bonxai'),
-                    'map_storage.save_on_shutdown': True,
-                },
-            ],
-        )
-        for robot_name in ('robot1', 'robot2')
-    ]
+    humanoid_map = Node(
+        package='bonxai_ros',
+        executable='bonxai_server_node',
+        namespace='humanoid',
+        name='bonxai_server_node',
+        output='screen',
+        parameters=[
+            str(bonxai_file),
+            {
+                'topic_in': '/humanoid/points',
+                'delta_topic_in': '/humanoid/comm/drone_voxel_delta',
+                'map_storage.path': str(package_share / 'maps' / 'static_map.bonxai'),
+                'map_storage.save_on_shutdown': True,
+            },
+        ],
+    )
 
-    communication_senders = [
-        Node(
-            package='surf_multirobot_sim',
-            executable='voxel_delta_sender',
-            namespace=robot_name,
-            name='voxel_delta_sender',
-            output='screen',
-            parameters=[str(communication_file), {'robot_name': robot_name}],
-        )
-        for robot_name in ('robot1', 'robot2')
-    ]
+    drone_map = Node(
+        package='bonxai_ros',
+        executable='bonxai_server_node',
+        namespace='drone',
+        name='bonxai_server_node',
+        output='screen',
+        parameters=[
+            str(bonxai_file),
+            {
+                'topic_in': '/drone/points',
+                'delta_topic_in': '',
+                'map_storage.load_on_startup': False,
+                'map_storage.save_on_shutdown': False,
+            },
+        ],
+    )
 
-    communication_receivers = [
-        Node(
-            package='surf_multirobot_sim',
-            executable='voxel_delta_receiver',
-            namespace=robot_name,
-            name='voxel_delta_receiver',
-            output='screen',
-            parameters=[str(communication_file), {'robot_name': robot_name}],
-        )
-        for robot_name in ('robot1', 'robot2')
-    ]
+    drone_sender = Node(
+        package='surf_drone',
+        executable='drone_scan_sender',
+        namespace='drone',
+        name='drone_scan_sender',
+        output='screen',
+        parameters=[str(drone_file)],
+    )
+
+    humanoid_receiver = Node(
+        package='surf_humanoid',
+        executable='drone_data_receiver',
+        namespace='humanoid',
+        name='drone_data_receiver',
+        output='screen',
+        parameters=[str(humanoid_file)],
+    )
 
     def link_node(source, destination, radio, **profile):
         reliable = radio == 'wifi'
@@ -136,20 +147,18 @@ def generate_launch_description():
             }],
         )
 
-    link_emulators = []
-    for source, destination in (('robot1', 'robot2'), ('robot2', 'robot1')):
-        link_emulators.extend([
-            link_node(
-                source, destination, 'halow', bandwidth_mbps=4.0,
-                latency_ms=25.0, jitter_ms=5.0, loss_percent=0.5,
-                queue_depth=2, freshness_first=True,
-            ),
-            link_node(
-                source, destination, 'wifi', bandwidth_mbps=80.0,
-                latency_ms=8.0, jitter_ms=2.0, loss_percent=0.1,
-                queue_depth=20, freshness_first=False,
-            ),
-        ])
+    link_emulators = [
+        link_node(
+            'drone', 'humanoid', 'halow', bandwidth_mbps=4.0,
+            latency_ms=25.0, jitter_ms=5.0, loss_percent=0.5,
+            queue_depth=2, freshness_first=True,
+        ),
+        link_node(
+            'drone', 'humanoid', 'wifi', bandwidth_mbps=80.0,
+            latency_ms=8.0, jitter_ms=2.0, loss_percent=0.1,
+            queue_depth=20, freshness_first=False,
+        ),
+    ]
 
     fast_lio_nodes = [
         Node(
@@ -176,7 +185,7 @@ def generate_launch_description():
                 ('/Laser_map', f'/{robot_name}/lio/map'),
             ],
         )
-        for robot_name in ('robot1', 'robot2')
+        for robot_name in ('humanoid', 'drone')
     ]
 
     ground_truth_bridges = [
@@ -192,7 +201,7 @@ def generate_launch_description():
                 (f'/model/{robot_name}/pose', f'/{robot_name}/ground_truth_tf'),
             ],
         )
-        for robot_name in ('robot1', 'robot2')
+        for robot_name in ('humanoid', 'drone')
     ]
 
     localization_nodes = [
@@ -209,7 +218,7 @@ def generate_launch_description():
                 'base_z_offset': 0.25,
             }],
         )
-        for robot_name in ('robot1', 'robot2')
+        for robot_name in ('humanoid', 'drone')
     ]
 
     static_transforms = [
@@ -230,8 +239,8 @@ def generate_launch_description():
             arguments=[
                 '--x', '0', '--y', '0', '--z', '0.50',
                 '--roll', '0', '--pitch', '0', '--yaw', '0',
-                '--frame-id', 'robot1/base_link',
-                '--child-frame-id', 'robot1/lidar_link',
+                '--frame-id', 'humanoid/base_link',
+                '--child-frame-id', 'humanoid/lidar_link',
             ],
         ),
         Node(
@@ -240,8 +249,8 @@ def generate_launch_description():
             arguments=[
                 '--x', '0', '--y', '0', '--z', '0.50',
                 '--roll', '0', '--pitch', '0', '--yaw', '0',
-                '--frame-id', 'robot2/base_link',
-                '--child-frame-id', 'robot2/lidar_link',
+                '--frame-id', 'drone/base_link',
+                '--child-frame-id', 'drone/lidar_link',
             ],
         ),
     ]
@@ -265,14 +274,15 @@ def generate_launch_description():
         ),
         gazebo,
         rviz,
-        TimerAction(period=2.0, actions=[robot1, robot2]),
+        TimerAction(period=2.0, actions=[humanoid, drone]),
         TimerAction(
             period=3.0,
             actions=[
                 bridge,
-                *bonxai_nodes,
-                *communication_senders,
-                *communication_receivers,
+                humanoid_map,
+                drone_map,
+                drone_sender,
+                humanoid_receiver,
                 *link_emulators,
                 *fast_lio_nodes, *ground_truth_bridges,
                 *localization_nodes, *static_transforms,

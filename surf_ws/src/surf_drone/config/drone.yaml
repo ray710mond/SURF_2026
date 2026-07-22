@@ -1,7 +1,13 @@
-/**/voxel_delta_sender:
+/**/drone_scan_sender:
   ros__parameters:
     use_sim_time: true
+    robot_name: drone
     map_frame: map
+    input_topic: /drone/points
+    realtime_topic: /drone/comm/halow_tx
+    sync_topic: /drone/comm/wifi_tx
+    link_metrics_topic: /drone/comm/halow_metrics
+    metrics_topic: /drone/comm/pipeline_metrics
     resolution: 0.20
     compression_level: 1
     delta_refresh_scans: 50
@@ -30,8 +36,3 @@
       minimum_dwell_seconds: 5.0
       ewma_alpha: 0.20
       congested_queue_depth: 2
-
-/**/voxel_delta_receiver:
-  ros__parameters:
-    use_sim_time: true
-    maximum_uncompressed_bytes: 67108864

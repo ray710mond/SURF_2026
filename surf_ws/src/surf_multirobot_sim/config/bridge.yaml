@@ -5,56 +5,56 @@
   direction: GZ_TO_ROS
   qos_profile: CLOCK
 
-- ros_topic_name: /robot1/cmd_vel
-  gz_topic_name: /model/robot1/cmd_vel
+- ros_topic_name: /humanoid/cmd_vel
+  gz_topic_name: /model/humanoid/cmd_vel
   ros_type_name: geometry_msgs/msg/Twist
   gz_type_name: gz.msgs.Twist
   direction: ROS_TO_GZ
 
-- ros_topic_name: /robot2/cmd_vel
-  gz_topic_name: /model/robot2/cmd_vel
+- ros_topic_name: /drone/cmd_vel
+  gz_topic_name: /model/drone/cmd_vel
   ros_type_name: geometry_msgs/msg/Twist
   gz_type_name: gz.msgs.Twist
   direction: ROS_TO_GZ
 
-- ros_topic_name: /robot1/odom
-  gz_topic_name: /model/robot1/odometry
+- ros_topic_name: /humanoid/odom
+  gz_topic_name: /model/humanoid/odometry
   ros_type_name: nav_msgs/msg/Odometry
   gz_type_name: gz.msgs.Odometry
   direction: GZ_TO_ROS
 
-- ros_topic_name: /robot2/odom
-  gz_topic_name: /model/robot2/odometry
+- ros_topic_name: /drone/odom
+  gz_topic_name: /model/drone/odometry
   ros_type_name: nav_msgs/msg/Odometry
   gz_type_name: gz.msgs.Odometry
   direction: GZ_TO_ROS
 
-- ros_topic_name: /robot1/imu
-  gz_topic_name: /world/outdoor/model/robot1/link/base_link/sensor/imu/imu
+- ros_topic_name: /humanoid/imu
+  gz_topic_name: /world/outdoor/model/humanoid/link/base_link/sensor/imu/imu
   ros_type_name: sensor_msgs/msg/Imu
   gz_type_name: gz.msgs.IMU
   direction: GZ_TO_ROS
   qos_profile: SENSOR_DATA
 
-- ros_topic_name: /robot2/imu
-  gz_topic_name: /world/outdoor/model/robot2/link/base_link/sensor/imu/imu
+- ros_topic_name: /drone/imu
+  gz_topic_name: /world/outdoor/model/drone/link/base_link/sensor/imu/imu
   ros_type_name: sensor_msgs/msg/Imu
   gz_type_name: gz.msgs.IMU
   direction: GZ_TO_ROS
   qos_profile: SENSOR_DATA
 
-- ros_topic_name: /robot1/points
-  gz_topic_name: /world/outdoor/model/robot1/link/lidar_link/sensor/lidar/scan/points
+- ros_topic_name: /humanoid/points
+  gz_topic_name: /world/outdoor/model/humanoid/link/lidar_link/sensor/lidar/scan/points
   ros_type_name: sensor_msgs/msg/PointCloud2
   gz_type_name: gz.msgs.PointCloudPacked
   direction: GZ_TO_ROS
   qos_profile: SENSOR_DATA
-  frame_id: robot1/lidar_link
+  frame_id: humanoid/lidar_link
 
-- ros_topic_name: /robot2/points
-  gz_topic_name: /world/outdoor/model/robot2/link/lidar_link/sensor/lidar/scan/points
+- ros_topic_name: /drone/points
+  gz_topic_name: /world/outdoor/model/drone/link/lidar_link/sensor/lidar/scan/points
   ros_type_name: sensor_msgs/msg/PointCloud2
   gz_type_name: gz.msgs.PointCloudPacked
   direction: GZ_TO_ROS
   qos_profile: SENSOR_DATA
-  frame_id: robot2/lidar_link
+  frame_id: drone/lidar_link

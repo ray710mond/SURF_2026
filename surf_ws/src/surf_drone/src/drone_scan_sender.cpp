@@ -29,10 +29,10 @@
 #include "surf_multirobot_msgs/msg/link_metrics.hpp"
 #include "surf_multirobot_msgs/msg/pipeline_metrics.hpp"
 #include "surf_multirobot_msgs/msg/voxel_delta.hpp"
-#include "surf_multirobot_sim/adaptive_mode.hpp"
-#include "surf_multirobot_sim/voxel_codec.hpp"
+#include "surf_drone/adaptive_mode.hpp"
+#include "surf_drone/voxel_codec.hpp"
 
-namespace surf_multirobot_sim
+namespace surf_drone
 {
 namespace
 {
@@ -96,14 +96,14 @@ double steady_seconds()
 
 }  // namespace
 
-class VoxelDeltaSender : public rclcpp::Node
+class DroneScanSender : public rclcpp::Node
 {
 public:
-  VoxelDeltaSender()
-  : Node("voxel_delta_sender"),
+  DroneScanSender()
+  : Node("drone_scan_sender"),
     adaptive_(load_adaptive_config())
   {
-    robot_name_ = declare_parameter<std::string>("robot_name", "robot1");
+    robot_name_ = declare_parameter<std::string>("robot_name", "drone");
     map_frame_ = declare_parameter<std::string>("map_frame", "map");
     input_topic_ = declare_parameter<std::string>("input_topic", "/" + robot_name_ + "/points");
     static_map_topic_ = declare_parameter<std::string>(
@@ -181,20 +181,20 @@ public:
       });
     static_map_subscription_ = create_subscription<sensor_msgs::msg::PointCloud2>(
       static_map_topic_, rclcpp::QoS(1).reliable().durability_volatile(),
-      std::bind(&VoxelDeltaSender::static_map_callback, this, std::placeholders::_1));
+      std::bind(&DroneScanSender::static_map_callback, this, std::placeholders::_1));
     link_metrics_subscription_ = create_subscription<surf_multirobot_msgs::msg::LinkMetrics>(
       link_metrics_topic_, rclcpp::QoS(10),
-      std::bind(&VoxelDeltaSender::link_metrics_callback, this, std::placeholders::_1));
+      std::bind(&DroneScanSender::link_metrics_callback, this, std::placeholders::_1));
 
     last_sync_time_ = steady_seconds() - std::max(0.0, sync_interval_seconds_);
-    worker_ = std::thread(&VoxelDeltaSender::worker_loop, this);
+    worker_ = std::thread(&DroneScanSender::worker_loop, this);
     RCLCPP_INFO(get_logger(),
       "%s communication sender: %s -> [%s, %s], resolution %.2fm",
       robot_name_.c_str(), input_topic_.c_str(), realtime_topic_.c_str(), sync_topic_.c_str(),
       resolution_);
   }
 
-  ~VoxelDeltaSender() override
+  ~DroneScanSender() override
   {
     stop_.store(true);
     queue_condition_.notify_all();
@@ -661,12 +661,12 @@ private:
   rclcpp::Publisher<surf_multirobot_msgs::msg::PipelineMetrics>::SharedPtr metrics_publisher_;
 };
 
-}  // namespace surf_multirobot_sim
+}  // namespace surf_drone
 
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<surf_multirobot_sim::VoxelDeltaSender>());
+  rclcpp::spin(std::make_shared<surf_drone::DroneScanSender>());
   rclcpp::shutdown();
   return 0;
 }

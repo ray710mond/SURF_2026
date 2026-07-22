@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -7,24 +8,24 @@
 
 #include "surf_multirobot_msgs/msg/compressed_voxel_delta.hpp"
 #include "surf_multirobot_msgs/msg/voxel_delta.hpp"
-#include "surf_multirobot_sim/voxel_codec.hpp"
+#include "surf_humanoid/voxel_codec.hpp"
 
-namespace surf_multirobot_sim
+namespace surf_humanoid
 {
 
-class VoxelDeltaReceiver : public rclcpp::Node
+class DroneDataReceiver : public rclcpp::Node
 {
 public:
-  VoxelDeltaReceiver()
-  : Node("voxel_delta_receiver")
+  DroneDataReceiver()
+  : Node("drone_data_receiver")
   {
-    robot_name_ = declare_parameter<std::string>("robot_name", "robot2");
+    robot_name_ = declare_parameter<std::string>("robot_name", "humanoid");
     realtime_topic_ = declare_parameter<std::string>(
       "realtime_topic", "/" + robot_name_ + "/comm/halow_rx");
     sync_topic_ = declare_parameter<std::string>(
       "sync_topic", "/" + robot_name_ + "/comm/wifi_rx");
     output_topic_ = declare_parameter<std::string>(
-      "output_topic", "/" + robot_name_ + "/comm/voxel_delta");
+      "output_topic", "/" + robot_name_ + "/comm/drone_voxel_delta");
     maximum_uncompressed_bytes_ = static_cast<std::size_t>(std::max<int64_t>(
       1024, declare_parameter<int64_t>("maximum_uncompressed_bytes", 64 * 1024 * 1024)));
 
@@ -33,10 +34,10 @@ public:
     realtime_subscription_ = create_subscription<
       surf_multirobot_msgs::msg::CompressedVoxelDelta>(
       realtime_topic_, rclcpp::QoS(rclcpp::KeepLast(2)).best_effort().durability_volatile(),
-      std::bind(&VoxelDeltaReceiver::receive, this, std::placeholders::_1));
+      std::bind(&DroneDataReceiver::receive, this, std::placeholders::_1));
     sync_subscription_ = create_subscription<surf_multirobot_msgs::msg::CompressedVoxelDelta>(
       sync_topic_, rclcpp::QoS(rclcpp::KeepLast(10)).reliable().durability_volatile(),
-      std::bind(&VoxelDeltaReceiver::receive, this, std::placeholders::_1));
+      std::bind(&DroneDataReceiver::receive, this, std::placeholders::_1));
 
     RCLCPP_INFO(get_logger(), "%s receiver: [%s, %s] -> %s",
       robot_name_.c_str(), realtime_topic_.c_str(), sync_topic_.c_str(), output_topic_.c_str());
@@ -133,12 +134,12 @@ private:
     sync_subscription_;
 };
 
-}  // namespace surf_multirobot_sim
+}  // namespace surf_humanoid
 
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<surf_multirobot_sim::VoxelDeltaReceiver>());
+  rclcpp::spin(std::make_shared<surf_humanoid::DroneDataReceiver>());
   rclcpp::shutdown();
   return 0;
 }

@@ -1,4 +1,4 @@
-#include "surf_multirobot_sim/voxel_codec.hpp"
+#include "surf_humanoid/voxel_codec.hpp"
 
 #include <algorithm>
 #include <array>
@@ -8,7 +8,7 @@
 
 #include <zstd.h>
 
-namespace surf_multirobot_sim
+namespace surf_humanoid
 {
 namespace
 {
@@ -247,4 +247,4 @@ CodecResult decode_delta(
   return {true, {}};
 }
 
-}  // namespace surf_multirobot_sim
+}  // namespace surf_humanoid
