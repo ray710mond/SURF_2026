@@ -1,5 +1,5 @@
 .vscode/
-data_tracking/
+data_collection/
 *.pdf
 *.gv
 devel/
