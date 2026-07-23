@@ -10,6 +10,8 @@ from ament_index_python.packages import get_package_prefix
 from rclpy.node import Node
 from surf_multirobot_msgs.msg import DeliveryMetrics, LinkMetrics, PipelineMetrics
 
+from surf_data_tracker.adaptive_mode_report import write_mode_reports
+
 
 class DataTracker(Node):
     """Writes raw observations to SQLite and a report-ready aggregate to JSON."""
@@ -34,6 +36,8 @@ class DataTracker(Node):
         self.summary_path = self.run_directory / 'summary.json'
         self.report_csv_path = self.run_directory / 'report.csv'
         self.report_markdown_path = self.run_directory / 'report.md'
+        self.mode_json_path = self.run_directory / 'adaptive_modes.json'
+        self.mode_csv_path = self.run_directory / 'adaptive_modes.csv'
         self.db = sqlite3.connect(self.db_path)
         self.db.execute('PRAGMA journal_mode=WAL')
         self.db.execute('PRAGMA synchronous=NORMAL')
@@ -130,6 +134,8 @@ class DataTracker(Node):
         n, raw_pts, valid, unique, static, temporal, selected, raw_b, encoded, payload, wire, proc, comp = [
             value or 0 for value in row]
         pct = lambda removed, before: 100.0 * removed / before if before else 0.0
+        mode_residency = write_mode_reports(
+            self.db, self.mode_json_path, self.mode_csv_path)
         summary = {
             'run': {
                 'id': self.run_id,
@@ -148,6 +154,7 @@ class DataTracker(Node):
                 'end_to_end_wire_vs_raw_bytes': pct(raw_b - wire, raw_b),
             },
             'mean_latency_ms': {'sender_processing': proc, 'compression': comp},
+            'adaptive_mode_residency': mode_residency,
             'notes': [
                 'Point/voxel reductions are element-count attribution, not byte attribution.',
                 'Compression and end-to-end reductions use measured serialized byte counts.',

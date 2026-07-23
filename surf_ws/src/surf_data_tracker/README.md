@@ -10,7 +10,9 @@ surf_ws/src/surf_data_tracker/data_collection/
 ├── telemetry.sqlite3
 ├── summary.json
 ├── report.csv
-└── report.md
+├── report.md
+├── adaptive_modes.json
+└── adaptive_modes.csv
 ```
 
 For an installed deployment without a source workspace, it falls back to the package
@@ -25,6 +27,20 @@ UTC start time. An optional human-readable label is prepended to the identifier:
 
 ```bash
 ros2 run surf_data_tracker data_tracker --ros-args -p run_label:=no_static_filter
+```
+
+`adaptive_modes.json` and `adaptive_modes.csv` show the measured simulation time
+and percentage spent in `FULL`, `VOXEL_DELTAS`, `DYNAMIC_ONLY`, and
+`METADATA_ONLY`. Each interval between consecutive realtime pipeline metrics is
+credited to the mode at the start of that interval. This is time-weighted rather
+than sample-count-weighted, excludes duplicate synchronization traffic, and uses
+simulation timestamps so pausing Gazebo does not inflate a mode.
+
+Generate or refresh these files for an older run:
+
+```bash
+ros2 run surf_data_tracker adaptive_mode_report \
+  ~/SURF_2026/surf_ws/src/surf_data_tracker/data_collection/<run-directory>
 ```
 
 The database deliberately preserves raw measurements. Static filtering and temporal

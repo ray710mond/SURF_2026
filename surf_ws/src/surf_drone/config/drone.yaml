@@ -34,8 +34,8 @@
       static_min_hits: 20
       clear_min_misses: 3
     adaptive:
-      enabled: true
-      manual_mode: -1
+      enabled: false
+      manual_mode: 1
       full_min_mbps: 12.0
       delta_min_mbps: 3.0
       dynamic_min_mbps: 0.75

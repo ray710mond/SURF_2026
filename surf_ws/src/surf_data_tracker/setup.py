@@ -13,5 +13,8 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    entry_points={'console_scripts': ['data_tracker = surf_data_tracker.tracker:main']},
+    entry_points={'console_scripts': [
+        'data_tracker = surf_data_tracker.tracker:main',
+        'adaptive_mode_report = surf_data_tracker.adaptive_mode_report:main',
+    ]},
 )
