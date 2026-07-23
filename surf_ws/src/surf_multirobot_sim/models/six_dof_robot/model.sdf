@@ -24,14 +24,6 @@
           <diffuse>0.08 0.55 0.38 1</diffuse>
         </material>
       </visual>
-      <visual name="nose_visual">
-        <pose>0.48 0 0 0 1.570796 0</pose>
-        <geometry><cone><radius>0.18</radius><length>0.30</length></cone></geometry>
-        <material>
-          <ambient>0.95 0.45 0.08 1</ambient>
-          <diffuse>0.95 0.45 0.08 1</diffuse>
-        </material>
-      </visual>
       <sensor name="imu" type="imu">
         <always_on>true</always_on>
         <update_rate>200</update_rate>
