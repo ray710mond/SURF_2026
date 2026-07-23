@@ -12,24 +12,23 @@ find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(surf_multirobot_comms REQUIRED)
 find_package(surf_multirobot_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(Threads REQUIRED)
-find_package(zstd_vendor REQUIRED)
-find_package(zstd REQUIRED)
 
-add_library(drone_communication_core src/adaptive_mode.cpp src/voxel_codec.cpp)
+add_library(drone_communication_core src/adaptive_mode.cpp)
 target_include_directories(drone_communication_core PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 ament_target_dependencies(drone_communication_core PUBLIC surf_multirobot_msgs)
-target_link_libraries(drone_communication_core PUBLIC zstd::zstd)
 
 add_executable(drone_scan_sender src/drone_scan_sender.cpp)
 ament_target_dependencies(drone_scan_sender
-  geometry_msgs nav_msgs rclcpp sensor_msgs surf_multirobot_msgs tf2 tf2_geometry_msgs tf2_ros)
+  geometry_msgs nav_msgs rclcpp sensor_msgs surf_multirobot_comms surf_multirobot_msgs
+  tf2 tf2_geometry_msgs tf2_ros)
 target_link_libraries(drone_scan_sender drone_communication_core Threads::Threads)
 
 install(TARGETS drone_communication_core drone_scan_sender
@@ -40,10 +39,10 @@ install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
-  ament_add_gtest(test_drone_communication test/test_drone_communication.cpp)
-  if(TARGET test_drone_communication)
-    target_link_libraries(test_drone_communication drone_communication_core)
-    ament_target_dependencies(test_drone_communication surf_multirobot_msgs)
+  ament_add_gtest(test_adaptive_mode test/test_adaptive_mode.cpp)
+  if(TARGET test_adaptive_mode)
+    target_link_libraries(test_adaptive_mode drone_communication_core)
+    ament_target_dependencies(test_adaptive_mode surf_multirobot_msgs)
   endif()
 endif()
 ament_package()

@@ -11,7 +11,8 @@
 #include "surf_multirobot_msgs/msg/compressed_voxel_delta.hpp"
 #include "surf_multirobot_msgs/msg/delivery_metrics.hpp"
 #include "surf_multirobot_msgs/msg/voxel_delta.hpp"
-#include "surf_humanoid/voxel_codec.hpp"
+#include "surf_multirobot_comms/qos_profiles.hpp"
+#include "surf_multirobot_comms/voxel_codec.hpp"
 
 namespace surf_humanoid
 {
@@ -40,10 +41,10 @@ public:
       metrics_topic_, rclcpp::QoS(10));
     realtime_subscription_ = create_subscription<
       surf_multirobot_msgs::msg::CompressedVoxelDelta>(
-      realtime_topic_, rclcpp::QoS(rclcpp::KeepLast(2)).best_effort().durability_volatile(),
+      realtime_topic_, surf::comms::realtime_qos(),
       std::bind(&DroneDataReceiver::receive, this, std::placeholders::_1));
     sync_subscription_ = create_subscription<surf_multirobot_msgs::msg::CompressedVoxelDelta>(
-      sync_topic_, rclcpp::QoS(rclcpp::KeepLast(10)).reliable().durability_volatile(),
+      sync_topic_, surf::comms::sync_qos(),
       std::bind(&DroneDataReceiver::receive, this, std::placeholders::_1));
 
     RCLCPP_INFO(get_logger(), "%s receiver: [%s, %s] -> %s",
@@ -126,7 +127,8 @@ private:
     }
 
     surf_multirobot_msgs::msg::VoxelDelta delta;
-    const CodecResult result = decode_delta(*packet, delta, maximum_uncompressed_bytes_);
+    const surf::comms::CodecResult result =
+      surf::comms::decode_delta(*packet, delta, maximum_uncompressed_bytes_);
     if (!result.ok) {
       metrics.accepted = false;
       metrics.rejection_reason = result.error;

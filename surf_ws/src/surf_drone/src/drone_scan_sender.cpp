@@ -32,7 +32,8 @@
 #include "surf_multirobot_msgs/msg/pipeline_metrics.hpp"
 #include "surf_multirobot_msgs/msg/voxel_delta.hpp"
 #include "surf_drone/adaptive_mode.hpp"
-#include "surf_drone/voxel_codec.hpp"
+#include "surf_multirobot_comms/qos_profiles.hpp"
+#include "surf_multirobot_comms/voxel_codec.hpp"
 
 namespace surf_drone
 {
@@ -174,11 +175,10 @@ public:
       throw std::invalid_argument("pose_source.type must be 'tf' or 'odometry'");
     }
 
-    const auto realtime_qos = rclcpp::QoS(rclcpp::KeepLast(2)).best_effort().durability_volatile();
     realtime_publisher_ = create_publisher<surf_multirobot_msgs::msg::CompressedVoxelDelta>(
-      realtime_topic_, realtime_qos);
+      realtime_topic_, surf::comms::realtime_qos());
     sync_publisher_ = create_publisher<surf_multirobot_msgs::msg::CompressedVoxelDelta>(
-      sync_topic_, rclcpp::QoS(rclcpp::KeepLast(10)).reliable().durability_volatile());
+      sync_topic_, surf::comms::sync_qos());
     metrics_publisher_ = create_publisher<surf_multirobot_msgs::msg::PipelineMetrics>(
       metrics_topic_, rclcpp::QoS(10));
 
@@ -638,7 +638,8 @@ private:
   {
     surf_multirobot_msgs::msg::CompressedVoxelDelta wire;
     const auto compression_start = std::chrono::steady_clock::now();
-    const CodecResult result = encode_delta(delta, wire, compression_level_);
+    const surf::comms::CodecResult result =
+      surf::comms::encode_delta(delta, wire, compression_level_);
     const float compression_latency_ms = static_cast<float>(
       std::chrono::duration<double, std::milli>(
         std::chrono::steady_clock::now() - compression_start).count());
