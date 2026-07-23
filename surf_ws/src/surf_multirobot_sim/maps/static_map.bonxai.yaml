@@ -1,0 +1,4 @@
+format: bonxai_static_map_v1
+map_file: static_map.bonxai
+frame_id: map
+resolution: 0.1

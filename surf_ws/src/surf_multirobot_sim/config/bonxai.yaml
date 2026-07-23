@@ -23,7 +23,8 @@
       cleanup_interval_sec: 300.0
 
     map_storage:
-      path: /home/raymond/SURF_2026/surf_ws/src/surf_multirobot_sim/maps/static_map.bonxai
+      # two_robots.launch.py supplies a portable source-workspace path.
+      path: ""
       load_on_startup: true
       # Launch overrides persistence for the drone-local visualization map.
       save_on_shutdown: true

@@ -39,6 +39,14 @@ def generate_launch_description():
     drone_file = drone_share / 'config' / 'drone.yaml'
     humanoid_file = humanoid_share / 'config' / 'humanoid.yaml'
     fast_lio_file = package_share / 'config' / 'fast_lio_sim.yaml'
+    workspace_source_map = (
+        package_share.parents[3] / 'src' / 'surf_multirobot_sim' /
+        'maps' / 'static_map.bonxai'
+    )
+    default_map_path = (
+        workspace_source_map if workspace_source_map.parent.is_dir()
+        else package_share / 'maps' / 'static_map.bonxai'
+    )
 
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(str(ros_gz_share / 'launch' / 'gz_sim.launch.py')),
@@ -105,7 +113,7 @@ def generate_launch_description():
             {
                 'topic_in': '/humanoid/points',
                 'delta_topic_in': '/humanoid/comm/drone_voxel_delta',
-                'map_storage.path': str(package_share / 'maps' / 'static_map.bonxai'),
+                'map_storage.path': LaunchConfiguration('static_map_path'),
                 'map_storage.save_on_shutdown': True,
             },
         ],
@@ -298,6 +306,10 @@ def generate_launch_description():
     return LaunchDescription([
         SetEnvironmentVariable('GZ_SIM_RESOURCE_PATH', gz_resource_path),
         SetEnvironmentVariable('SDF_PATH', sdf_path),
+        DeclareLaunchArgument(
+            'static_map_path', default_value=str(default_map_path),
+            description='Persistent humanoid Bonxai map file',
+        ),
         DeclareLaunchArgument(
             'halow_trace', default_value='',
             description='CSV trace used to replay measured HaLow link conditions',
