@@ -48,6 +48,11 @@ install(
   DESTINATION share/${PROJECT_NAME}
 )
 
-install(PROGRAMS scripts/prepare_link_trace.py DESTINATION lib/${PROJECT_NAME})
+install(
+  PROGRAMS
+    scripts/prepare_link_trace.py
+    scripts/six_dof_teleop.py
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 ament_package()

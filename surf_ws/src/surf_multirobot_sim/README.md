@@ -1,7 +1,8 @@
 # SURF multi-robot mapping and communication simulation
 
-Two differential-drive simulation models stand in for the future `humanoid`
-and `drone` hardware. Only drone LiDAR data is filtered, voxelized, compressed,
+The `humanoid` uses a differential-drive simulation model and the second role
+uses a fully holonomic six-DOF inspection robot. The existing `drone` ROS
+namespace is retained for compatibility. Only its LiDAR data is filtered, voxelized, compressed,
 and transmitted. The humanoid decompresses that stream and fuses it with its
 own direct LiDAR input in one Bonxai map.
 
@@ -46,10 +47,10 @@ Bonxai server for each role, the drone sender, the humanoid receiver, and two
 one-way link emulators (HaLow realtime plus Wi-Fi synchronization).
 
 Gazebo loads the Caltech / Throop Memorial Garden environment from the separate
-`surf_gazebo_world` package. The robot simulation model remains defined in
-`surf_multirobot_sim/models/diffbot/model.sdf`; the launch file spawns it as the
-`humanoid` and `drone` directly south of the main building stairs, facing the
-entrance.
+`surf_gazebo_world` package. The ground model is defined in
+`models/diffbot/model.sdf`; the six-DOF model is defined in
+`models/six_dof_robot/model.sdf`. The latter starts two metres above the ground
+and accepts body-frame X, Y, Z, roll, pitch, and yaw velocity commands.
 
 The real-time path uses the HaLow profile with a freshness-first queue of depth
 two. Periodic full refreshes and retained deletion tombstones use the reliable
@@ -94,11 +95,20 @@ ros2 run teleop_twist_keyboard teleop_twist_keyboard \
   --ros-args -r cmd_vel:=/humanoid/cmd_vel
 ```
 
-Drone, in another terminal:
+Six-DOF robot (still under the `/drone` namespace), in another terminal:
 
 ```bash
-ros2 run teleop_twist_keyboard teleop_twist_keyboard \
-  --ros-args -r cmd_vel:=/drone/cmd_vel
+ros2 run surf_multirobot_sim six_dof_teleop.py
+```
+
+The controls are `W/S` for X, `A/D` for Y, `R/F` for Z (up/down), `U/J` for
+roll, `I/K` for pitch, and `O/L` for yaw. Space publishes a stop command.
+
+You can also command an exact six-axis velocity directly:
+
+```bash
+ros2 topic pub --once /drone/cmd_vel geometry_msgs/msg/Twist \
+  '{linear: {x: 0.0, y: 0.0, z: 1.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}'
 ```
 
 ## Communication architecture

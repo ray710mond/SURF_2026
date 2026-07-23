@@ -1,0 +1,107 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <!-- Ideal holonomic inspection robot. VelocityControl applies all three
+       linear and all three angular components of gz.msgs.Twist. -->
+  <model name="six_dof_robot" canonical_link="base_link">
+    <self_collide>false</self_collide>
+    <allow_auto_disable>false</allow_auto_disable>
+
+    <link name="base_link">
+      <inertial>
+        <mass>12.0</mass>
+        <inertia>
+          <ixx>0.42</ixx><iyy>0.55</iyy><izz>0.68</izz>
+          <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="body_collision">
+        <geometry><box><size>0.80 0.55 0.30</size></box></geometry>
+      </collision>
+      <visual name="body_visual">
+        <geometry><box><size>0.80 0.55 0.30</size></box></geometry>
+        <material>
+          <ambient>0.08 0.55 0.38 1</ambient>
+          <diffuse>0.08 0.55 0.38 1</diffuse>
+        </material>
+      </visual>
+      <visual name="nose_visual">
+        <pose>0.48 0 0 0 1.570796 0</pose>
+        <geometry><cone><radius>0.18</radius><length>0.30</length></cone></geometry>
+        <material>
+          <ambient>0.95 0.45 0.08 1</ambient>
+          <diffuse>0.95 0.45 0.08 1</diffuse>
+        </material>
+      </visual>
+      <sensor name="imu" type="imu">
+        <always_on>true</always_on>
+        <update_rate>200</update_rate>
+        <enable_metrics>true</enable_metrics>
+      </sensor>
+    </link>
+
+    <link name="lidar_link">
+      <pose>0 0 0.28 0 0 0</pose>
+      <inertial>
+        <mass>1.0</mass>
+        <inertia>
+          <ixx>0.0055</ixx><iyy>0.0055</iyy><izz>0.0072</izz>
+          <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="collision">
+        <geometry><cylinder><radius>0.12</radius><length>0.15</length></cylinder></geometry>
+      </collision>
+      <visual name="visual">
+        <geometry><cylinder><radius>0.12</radius><length>0.15</length></cylinder></geometry>
+        <material><ambient>0.05 0.05 0.05 1</ambient><diffuse>0.05 0.05 0.05 1</diffuse></material>
+      </visual>
+      <sensor name="lidar" type="gpu_lidar">
+        <always_on>true</always_on>
+        <update_rate>10</update_rate>
+        <visualize>false</visualize>
+        <ray>
+          <scan>
+            <horizontal>
+              <samples>720</samples><resolution>1</resolution>
+              <min_angle>-3.14159265</min_angle><max_angle>3.14159265</max_angle>
+            </horizontal>
+            <vertical>
+              <samples>16</samples><resolution>1</resolution>
+              <min_angle>-0.261799</min_angle><max_angle>0.261799</max_angle>
+            </vertical>
+          </scan>
+          <range><min>0.30</min><max>50.0</max><resolution>0.01</resolution></range>
+          <noise><type>gaussian</type><mean>0.0</mean><stddev>0.01</stddev></noise>
+        </ray>
+      </sensor>
+    </link>
+
+    <joint name="lidar_joint" type="fixed">
+      <parent>base_link</parent><child>lidar_link</child>
+    </joint>
+
+    <plugin filename="gz-sim-velocity-control-system"
+            name="gz::sim::systems::VelocityControl">
+      <topic>/model/drone/cmd_vel</topic>
+    </plugin>
+    <plugin filename="gz-sim-odometry-publisher-system"
+            name="gz::sim::systems::OdometryPublisher">
+      <dimensions>3</dimensions>
+      <odom_frame>drone/odom</odom_frame>
+      <robot_base_frame>drone/base_link</robot_base_frame>
+      <odom_publish_frequency>50</odom_publish_frequency>
+      <odom_topic>/model/drone/odometry</odom_topic>
+    </plugin>
+    <plugin filename="gz-sim-pose-publisher-system" name="gz::sim::systems::PosePublisher">
+      <publish_model_pose>true</publish_model_pose>
+      <publish_link_pose>false</publish_link_pose>
+      <publish_collision_pose>false</publish_collision_pose>
+      <publish_visual_pose>false</publish_visual_pose>
+      <publish_sensor_pose>false</publish_sensor_pose>
+      <publish_nested_model_pose>false</publish_nested_model_pose>
+      <use_pose_vector_msg>true</use_pose_vector_msg>
+      <static_publisher>false</static_publisher>
+      <update_frequency>30</update_frequency>
+    </plugin>
+  </model>
+</sdf>

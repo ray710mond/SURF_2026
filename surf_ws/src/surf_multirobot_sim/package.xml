@@ -2,7 +2,7 @@
 <package format="3">
   <name>surf_multirobot_sim</name>
   <version>0.0.1</version>
-  <description>Two differential-drive robots with 3D LiDAR in Gazebo Harmonic.</description>
+  <description>Ground and six-DOF robots with 3D LiDAR in Gazebo Harmonic.</description>
   <maintainer email="raymond@todo.invalid">Raymond</maintainer>
   <license>Apache-2.0</license>
 
@@ -14,7 +14,9 @@
   <exec_depend>ros_gz_sim</exec_depend>
   <exec_depend>ros_gz_bridge</exec_depend>
   <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>rclpy</exec_depend>
   <exec_depend>rosgraph_msgs</exec_depend>
+  <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>tf2</depend>

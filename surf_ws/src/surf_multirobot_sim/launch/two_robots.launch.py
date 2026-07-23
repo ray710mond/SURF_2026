@@ -33,8 +33,16 @@ def generate_launch_description():
     existing_sdf_path = os.environ.get('SDF_PATH')
     if existing_sdf_path:
         sdf_path += os.pathsep + existing_sdf_path
-    robot_file = package_share / 'models' / 'diffbot' / 'model.sdf'
-    robot_description = (package_share / 'models' / 'diffbot' / 'model.urdf').read_text()
+    humanoid_model_file = package_share / 'models' / 'diffbot' / 'model.sdf'
+    six_dof_model_file = package_share / 'models' / 'six_dof_robot' / 'model.sdf'
+    robot_descriptions = {
+        'humanoid': (
+            package_share / 'models' / 'diffbot' / 'model.urdf'
+        ).read_text(),
+        'drone': (
+            package_share / 'models' / 'six_dof_robot' / 'model.urdf'
+        ).read_text(),
+    }
     bridge_file = package_share / 'config' / 'bridge.yaml'
     bonxai_file = package_share / 'config' / 'bonxai.yaml'
     drone_file = drone_share / 'config' / 'drone.yaml'
@@ -65,7 +73,7 @@ def generate_launch_description():
         arguments=[
             '-world', world_name,
             '-name', 'humanoid',
-            '-file', str(robot_file),
+            '-file', str(humanoid_model_file),
             '-x', '11.5', '-y', '13.2', '-z', '0.06', '-Y', '-1.570796',
         ],
     )
@@ -77,8 +85,8 @@ def generate_launch_description():
         arguments=[
             '-world', world_name,
             '-name', 'drone',
-            '-file', str(robot_file),
-            '-x', '16.5', '-y', '13.2', '-z', '0.06', '-Y', '-1.570796',
+            '-file', str(six_dof_model_file),
+            '-x', '16.5', '-y', '13.2', '-z', '2.0', '-Y', '-1.570796',
         ],
     )
 
@@ -256,7 +264,7 @@ def generate_launch_description():
                 'use_sim_time': True,
                 'robot_name': robot_name,
                 'map_frame': 'map',
-                'base_z_offset': 0.25,
+                'base_z_offset': 0.25 if robot_name == 'humanoid' else 0.0,
             }],
         )
         for robot_name in ('humanoid', 'drone')
@@ -279,7 +287,7 @@ def generate_launch_description():
             output='screen',
             parameters=[{
                 'use_sim_time': True,
-                'robot_description': robot_description,
+                'robot_description': robot_descriptions[robot_name],
                 'frame_prefix': f'{robot_name}/',
             }],
         )
