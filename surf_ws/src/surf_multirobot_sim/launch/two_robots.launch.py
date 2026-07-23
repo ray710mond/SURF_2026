@@ -34,6 +34,7 @@ def generate_launch_description():
     if existing_sdf_path:
         sdf_path += os.pathsep + existing_sdf_path
     robot_file = package_share / 'models' / 'diffbot' / 'model.sdf'
+    robot_description = (package_share / 'models' / 'diffbot' / 'model.urdf').read_text()
     bridge_file = package_share / 'config' / 'bridge.yaml'
     bonxai_file = package_share / 'config' / 'bonxai.yaml'
     drone_file = drone_share / 'config' / 'drone.yaml'
@@ -269,6 +270,22 @@ def generate_launch_description():
         parameters=[{'use_sim_time': True}],
     )
 
+    robot_model_publishers = [
+        Node(
+            package='robot_state_publisher',
+            executable='robot_state_publisher',
+            namespace=robot_name,
+            name='robot_state_publisher',
+            output='screen',
+            parameters=[{
+                'use_sim_time': True,
+                'robot_description': robot_description,
+                'frame_prefix': f'{robot_name}/',
+            }],
+        )
+        for robot_name in ('humanoid', 'drone')
+    ]
+
     static_transforms = [
         Node(
             package='tf2_ros',
@@ -279,26 +296,6 @@ def generate_launch_description():
                 '--roll', '0', '--pitch', '0', '--yaw', '0',
                 '--frame-id', 'world',
                 '--child-frame-id', 'map',
-            ],
-        ),
-        Node(
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            arguments=[
-                '--x', '0', '--y', '0', '--z', '0.50',
-                '--roll', '0', '--pitch', '0', '--yaw', '0',
-                '--frame-id', 'humanoid/base_link',
-                '--child-frame-id', 'humanoid/lidar_link',
-            ],
-        ),
-        Node(
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            arguments=[
-                '--x', '0', '--y', '0', '--z', '0.50',
-                '--roll', '0', '--pitch', '0', '--yaw', '0',
-                '--frame-id', 'drone/base_link',
-                '--child-frame-id', 'drone/lidar_link',
             ],
         ),
     ]
@@ -341,6 +338,7 @@ def generate_launch_description():
                 *link_emulators,
                 *fast_lio_nodes, *ground_truth_bridges,
                 *localization_nodes, odometry_tf, *static_transforms,
+                *robot_model_publishers,
             ],
         ),
     ])

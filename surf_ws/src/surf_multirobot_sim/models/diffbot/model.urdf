@@ -1,0 +1,66 @@
+<?xml version="1.0"?>
+<!-- RViz visualization counterpart of model.sdf. Gazebo remains authoritative
+     for collision, inertia, sensors, and dynamics. -->
+<robot name="surf_diffbot">
+  <material name="surf_blue"><color rgba="0.15 0.25 0.65 1"/></material>
+  <material name="dark"><color rgba="0.03 0.03 0.03 1"/></material>
+  <material name="gray"><color rgba="0.15 0.15 0.15 1"/></material>
+
+  <link name="base_link">
+    <visual>
+      <geometry><box size="0.70 0.50 0.20"/></geometry>
+      <material name="surf_blue"/>
+    </visual>
+  </link>
+
+  <link name="left_wheel">
+    <visual>
+      <origin rpy="1.570796 0 0"/>
+      <geometry><cylinder radius="0.15" length="0.08"/></geometry>
+      <material name="dark"/>
+    </visual>
+  </link>
+  <joint name="left_wheel_visual_joint" type="fixed">
+    <parent link="base_link"/><child link="left_wheel"/>
+    <origin xyz="0 0.29 -0.10"/>
+  </joint>
+
+  <link name="right_wheel">
+    <visual>
+      <origin rpy="1.570796 0 0"/>
+      <geometry><cylinder radius="0.15" length="0.08"/></geometry>
+      <material name="dark"/>
+    </visual>
+  </link>
+  <joint name="right_wheel_visual_joint" type="fixed">
+    <parent link="base_link"/><child link="right_wheel"/>
+    <origin xyz="0 -0.29 -0.10"/>
+  </joint>
+
+  <link name="rear_caster">
+    <visual><geometry><sphere radius="0.08"/></geometry><material name="gray"/></visual>
+  </link>
+  <joint name="rear_caster_visual_joint" type="fixed">
+    <parent link="base_link"/><child link="rear_caster"/>
+    <origin xyz="-0.27 0 -0.17"/>
+  </joint>
+
+  <link name="front_caster">
+    <visual><geometry><sphere radius="0.08"/></geometry><material name="gray"/></visual>
+  </link>
+  <joint name="front_caster_visual_joint" type="fixed">
+    <parent link="base_link"/><child link="front_caster"/>
+    <origin xyz="0.27 0 -0.17"/>
+  </joint>
+
+  <link name="lidar_link">
+    <visual>
+      <geometry><cylinder radius="0.12" length="0.15"/></geometry>
+      <material name="dark"/>
+    </visual>
+  </link>
+  <joint name="lidar_visual_joint" type="fixed">
+    <parent link="base_link"/><child link="lidar_link"/>
+    <origin xyz="0 0 0.50"/>
+  </joint>
+</robot>

@@ -1,0 +1,31 @@
+{
+  "run": {
+    "id": "20260723T005028_095622Z_29b131dd",
+    "started_at_utc": "2026-07-23T00:50:28.095622+00:00",
+    "directory": "/home/raymond/SURF_2026/surf_ws/src/surf_data_tracker/data_collection/20260723T005028_095622Z_29b131dd"
+  },
+  "samples": 113,
+  "totals": {
+    "raw_bytes": 41676321,
+    "encoded_bytes": 63568,
+    "payload_bytes": 34684,
+    "wire_bytes": 48244
+  },
+  "reductions_percent": {
+    "invalid_or_range_filter_points": 55.62684365781711,
+    "voxelization_elements": 30.179075951470832,
+    "static_prior_voxels": 0.0,
+    "temporal_delta_voxels": 96.23935057077965,
+    "compression_bytes": 45.43795620437956,
+    "end_to_end_wire_vs_raw_bytes": 99.88424122177194
+  },
+  "mean_latency_ms": {
+    "sender_processing": 7.7434224976902515,
+    "compression": 0.09372337994915722
+  },
+  "notes": [
+    "Point/voxel reductions are element-count attribution, not byte attribution.",
+    "Compression and end-to-end reductions use measured serialized byte counts.",
+    "Compare experimental runs with one preprocessing feature changed for causal claims."
+  ]
+}
