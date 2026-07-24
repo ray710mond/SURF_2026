@@ -31,6 +31,17 @@
       min_z: 0.25
       max_z: 20.0
       self_radius: 0.70
+      humanoid_mask:
+        enabled: true
+        odometry_topic: /humanoid/odom
+        # Collision envelope from diffbot/model.sdf (wheels and lidar included).
+        model_size_x: 0.70
+        model_size_y: 0.66
+        model_size_z: 0.825
+        model_center_z: 0.4125
+        # Conservative by design: the humanoid fills this region itself.
+        padding: 0.20
+        max_age_ms: 150.0
       static_min_hits: 20
       clear_min_misses: 3
     adaptive:

@@ -131,9 +131,10 @@ mode, traffic class, and encoded payload. Decoded records explicitly encode:
 - observed free voxels;
 - deletion/reset tombstones.
 
-The drone sender filters invalid, out-of-range, self, vertically excluded, duplicate,
-static-map-redundant, and unchanged voxels. A completed scan is processed by a
-background worker while the ROS callback retains only the newest waiting scan.
+The drone sender filters invalid, out-of-range, self, humanoid-model, vertically
+excluded, duplicate, static-map-redundant, and unchanged voxels. A completed
+scan is processed by a background worker while the ROS callback retains only
+the newest waiting scan.
 Unseen dynamic cells expire after `dynamic_retention_scans` and become retained
 free-space tombstones, so a later full refresh cannot resurrect stale geometry.
 
@@ -215,6 +216,10 @@ In RViz:
 - The drone Bonxai server consumes every `/drone/points` scan locally and does
   not ingest remote deltas. Its local map is independent of the communication
   sender; only selected delta records are compressed and transmitted.
+- The sender uses timestamp-matched `/humanoid/odom` state and the configured
+  humanoid model envelope to suppress voxels on the humanoid. The mask applies
+  only to transmitted real-time and sync deltas; `/drone/points` still reaches
+  the drone Bonxai map unchanged.
 - Every sender epoch starts with a reliable full refresh. Later full refreshes
   atomically replace that source's layer, which reconciles packet loss and
   removes state absent from the snapshot.

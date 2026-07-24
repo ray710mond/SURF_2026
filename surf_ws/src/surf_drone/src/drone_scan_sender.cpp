@@ -137,6 +137,21 @@ public:
     min_z_ = declare_parameter<double>("filters.min_z", 0.25);
     max_z_ = declare_parameter<double>("filters.max_z", 20.0);
     self_radius_ = declare_parameter<double>("filters.self_radius", 0.70);
+    humanoid_mask_enabled_ = declare_parameter<bool>("filters.humanoid_mask.enabled", true);
+    humanoid_odometry_topic_ = declare_parameter<std::string>(
+      "filters.humanoid_mask.odometry_topic", "/humanoid/odom");
+    humanoid_mask_size_x_ = std::max(
+      0.0, declare_parameter<double>("filters.humanoid_mask.model_size_x", 0.70));
+    humanoid_mask_size_y_ = std::max(
+      0.0, declare_parameter<double>("filters.humanoid_mask.model_size_y", 0.66));
+    humanoid_mask_size_z_ = std::max(
+      0.0, declare_parameter<double>("filters.humanoid_mask.model_size_z", 0.825));
+    humanoid_mask_center_z_ = declare_parameter<double>(
+      "filters.humanoid_mask.model_center_z", 0.4125);
+    humanoid_mask_padding_ = std::max(
+      0.0, declare_parameter<double>("filters.humanoid_mask.padding", 0.20));
+    humanoid_mask_max_age_ms_ = std::max(
+      0.0, declare_parameter<double>("filters.humanoid_mask.max_age_ms", 150.0));
     static_min_hits_ = static_cast<int>(std::max<int64_t>(
       1, declare_parameter<int64_t>("filters.static_min_hits", 20)));
     clear_min_misses_ = static_cast<int>(std::max<int64_t>(
@@ -211,6 +226,17 @@ public:
     link_metrics_subscription_ = create_subscription<surf_multirobot_msgs::msg::LinkMetrics>(
       link_metrics_topic_, rclcpp::QoS(10),
       std::bind(&DroneScanSender::link_metrics_callback, this, std::placeholders::_1));
+    if (humanoid_mask_enabled_) {
+      humanoid_odometry_subscription_ = create_subscription<nav_msgs::msg::Odometry>(
+        humanoid_odometry_topic_, rclcpp::SensorDataQoS().keep_last(50),
+        [this](const nav_msgs::msg::Odometry::SharedPtr message) {
+          std::lock_guard<std::mutex> lock(humanoid_odometry_mutex_);
+          humanoid_odometry_history_.push_back(message);
+          while (humanoid_odometry_history_.size() > 200U) {
+            humanoid_odometry_history_.pop_front();
+          }
+        });
+    }
 
     last_sync_time_ = steady_seconds() - std::max(0.0, sync_interval_seconds_);
     worker_ = std::thread(&DroneScanSender::worker_loop, this);
@@ -220,6 +246,12 @@ public:
       resolution_);
     RCLCPP_INFO(get_logger(), "Pose source: %s%s", transform_source_.c_str(),
       transform_source_ == "odometry" ? (" on " + odometry_topic_).c_str() : "");
+    if (humanoid_mask_enabled_) {
+      RCLCPP_INFO(get_logger(),
+        "Humanoid communication mask: %.2f x %.2f x %.2fm model + %.2fm padding, state from %s",
+        humanoid_mask_size_x_, humanoid_mask_size_y_, humanoid_mask_size_z_,
+        humanoid_mask_padding_, humanoid_odometry_topic_.c_str());
+    }
   }
 
   ~DroneScanSender() override
@@ -350,6 +382,81 @@ private:
     }
   }
 
+  struct HumanoidMask
+  {
+    tf2::Vector3 center;
+    tf2::Quaternion world_from_model;
+    double half_x{0.0};
+    double half_y{0.0};
+    double half_z{0.0};
+
+    bool contains(double x, double y, double z) const
+    {
+      const tf2::Vector3 local =
+        tf2::quatRotate(world_from_model.inverse(), tf2::Vector3(x, y, z) - center);
+      return std::abs(local.x()) <= half_x &&
+             std::abs(local.y()) <= half_y &&
+             std::abs(local.z()) <= half_z;
+    }
+
+    bool contains(const Coord & coord, double resolution) const
+    {
+      // Test voxel centers. The configured padding is at least one voxel in
+      // the simulation profile, making boundary quantization conservative.
+      return contains(
+        (static_cast<double>(coord.x) + 0.5) * resolution,
+        (static_cast<double>(coord.y) + 0.5) * resolution,
+        (static_cast<double>(coord.z) + 0.5) * resolution);
+    }
+  };
+
+  std::unique_ptr<HumanoidMask> humanoid_mask_at(const builtin_interfaces::msg::Time & stamp)
+  {
+    if (!humanoid_mask_enabled_) {
+      return nullptr;
+    }
+    nav_msgs::msg::Odometry::SharedPtr nearest;
+    int64_t nearest_difference_ns = std::numeric_limits<int64_t>::max();
+    const rclcpp::Time target(stamp);
+    {
+      std::lock_guard<std::mutex> lock(humanoid_odometry_mutex_);
+      for (const auto & candidate : humanoid_odometry_history_) {
+        const int64_t difference = std::llabs(
+          (rclcpp::Time(candidate->header.stamp) - target).nanoseconds());
+        if (difference < nearest_difference_ns) {
+          nearest_difference_ns = difference;
+          nearest = candidate;
+        }
+      }
+    }
+    if (!nearest ||
+      static_cast<double>(nearest_difference_ns) / 1.0e6 > humanoid_mask_max_age_ms_)
+    {
+      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
+        "Humanoid communication mask has no state within %.0fms of the scan; passing scan unmasked",
+        humanoid_mask_max_age_ms_);
+      return nullptr;
+    }
+
+    auto mask = std::make_unique<HumanoidMask>();
+    tf2::fromMsg(nearest->pose.pose.orientation, mask->world_from_model);
+    if (mask->world_from_model.length2() < 1.0e-12) {
+      mask->world_from_model = tf2::Quaternion::getIdentity();
+    } else {
+      mask->world_from_model.normalize();
+    }
+    const tf2::Vector3 model_position(
+      nearest->pose.pose.position.x,
+      nearest->pose.pose.position.y,
+      nearest->pose.pose.position.z);
+    mask->center = model_position + tf2::quatRotate(
+      mask->world_from_model, tf2::Vector3(0.0, 0.0, humanoid_mask_center_z_));
+    mask->half_x = 0.5 * humanoid_mask_size_x_ + humanoid_mask_padding_;
+    mask->half_y = 0.5 * humanoid_mask_size_y_ + humanoid_mask_padding_;
+    mask->half_z = 0.5 * humanoid_mask_size_z_ + humanoid_mask_padding_;
+    return mask;
+  }
+
   void process_cloud(const sensor_msgs::msg::PointCloud2 & cloud)
   {
     const auto processing_start = std::chrono::steady_clock::now();
@@ -370,6 +477,7 @@ private:
       transform.transform.translation.y,
       transform.transform.translation.z);
     const Coord origin = quantize(translation.x(), translation.y(), translation.z(), resolution_);
+    const std::unique_ptr<HumanoidMask> humanoid_mask = humanoid_mask_at(cloud.header.stamp);
 
     uint32_t raw_points = cloud.width * cloud.height;
     uint32_t valid_points = 0;
@@ -391,6 +499,9 @@ private:
         if (mapped.z() < min_z_ || mapped.z() > max_z_ ||
           (mapped - translation).length2() < self_radius_ * self_radius_)
         {
+          continue;
+        }
+        if (humanoid_mask && humanoid_mask->contains(mapped.x(), mapped.y(), mapped.z())) {
           continue;
         }
         current.insert(quantize(mapped.x(), mapped.y(), mapped.z(), resolution_));
@@ -424,6 +535,27 @@ private:
 
     const auto occupancy_selection_start = std::chrono::steady_clock::now();
     uint32_t static_prior_voxels = 0U;
+
+    // Communication state is deliberately scrubbed without publishing
+    // tombstones. The humanoid owns this volume and fills it from its onboard
+    // sensor; the drone's separate local map still receives the untouched scan.
+    if (humanoid_mask) {
+      for (auto it = cells_.begin(); it != cells_.end();) {
+        if (humanoid_mask->contains(it->first, resolution_)) {
+          tombstones_.erase(it->first);
+          it = cells_.erase(it);
+        } else {
+          ++it;
+        }
+      }
+      for (auto it = tombstones_.begin(); it != tombstones_.end();) {
+        if (humanoid_mask->contains(it->first, resolution_)) {
+          it = tombstones_.erase(it);
+        } else {
+          ++it;
+        }
+      }
+    }
 
     for (const auto & coord : current) {
       tombstones_.erase(coord);
@@ -726,6 +858,14 @@ private:
   double min_z_{0.25};
   double max_z_{20.0};
   double self_radius_{0.7};
+  bool humanoid_mask_enabled_{true};
+  std::string humanoid_odometry_topic_;
+  double humanoid_mask_size_x_{0.70};
+  double humanoid_mask_size_y_{0.66};
+  double humanoid_mask_size_z_{0.825};
+  double humanoid_mask_center_z_{0.4125};
+  double humanoid_mask_padding_{0.20};
+  double humanoid_mask_max_age_ms_{150.0};
   int static_min_hits_{20};
   int clear_min_misses_{3};
   int delta_refresh_scans_{50};
@@ -773,6 +913,10 @@ private:
   std::mutex odometry_mutex_;
   std::deque<nav_msgs::msg::Odometry::SharedPtr> odometry_history_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_subscription_;
+  std::mutex humanoid_odometry_mutex_;
+  std::deque<nav_msgs::msg::Odometry::SharedPtr> humanoid_odometry_history_;
+  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr
+    humanoid_odometry_subscription_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_subscription_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr static_map_subscription_;
   rclcpp::Subscription<surf_multirobot_msgs::msg::LinkMetrics>::SharedPtr
