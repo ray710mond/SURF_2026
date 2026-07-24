@@ -4,7 +4,7 @@ project(surf_gazebo_world)
 find_package(ament_cmake REQUIRED)
 
 install(
-  DIRECTORY launch models worlds
+  DIRECTORY config launch models worlds
   DESTINATION share/${PROJECT_NAME}
 )
 

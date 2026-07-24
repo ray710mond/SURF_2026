@@ -12,6 +12,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 def generate_launch_description():
     package_share = Path(get_package_share_directory("surf_gazebo_world"))
     world_path = package_share / "worlds" / "surf_world.sdf"
+    gui_config_path = package_share / "config" / "no_side_bar.config"
     ros_gz_share = Path(get_package_share_directory("ros_gz_sim"))
     resource_path = str(package_share / "models")
     existing_resource_path = os.environ.get("GZ_SIM_RESOURCE_PATH")
@@ -26,7 +27,9 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(
             str(ros_gz_share / "launch" / "gz_sim.launch.py")
         ),
-        launch_arguments={"gz_args": f"-r {world_path}"}.items(),
+        launch_arguments={
+            "gz_args": f"-r --gui-config {gui_config_path} {world_path}"
+        }.items(),
     )
 
     return LaunchDescription(

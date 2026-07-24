@@ -23,6 +23,7 @@ def generate_launch_description():
     ros_gz_share = Path(get_package_share_directory('ros_gz_sim'))
 
     world_file = world_share / 'worlds' / 'surf_world.sdf'
+    gui_config_file = world_share / 'config' / 'no_side_bar.config'
     world_name = 'gtl_turtle_pond'
     world_model_path = str(world_share / 'models')
     gz_resource_path = world_model_path
@@ -61,7 +62,8 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(str(ros_gz_share / 'launch' / 'gz_sim.launch.py')),
         launch_arguments={
             'gz_args': [
-                '-r -v 3 ', LaunchConfiguration('gz_extra_args'), ' ', str(world_file),
+                '-r -v 3 --gui-config ', str(gui_config_file), ' ',
+                LaunchConfiguration('gz_extra_args'), ' ', str(world_file),
             ],
         }.items(),
     )
